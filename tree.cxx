@@ -16,9 +16,23 @@ void tree::add(node *current_node, node *parent_node)
     }
 }
 
+void tree::print(node *pNode)
+{
+    visited[pNode] = true;
+    for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
+        (*it)->print();
+        auto search = visited.find(*it);
+        if(search == visited.end()) {
+            this->print((*it));
+        }
+    }
+}
+
 void node::print()
 {
-    cout << "Level: " << this->level << " element: " << this->element << " sup: " << this->support << endl << "D({";
+    cout << this << " Level: " << this->level << " element: " << this->element << " parent: "
+         << (this->parent == nullptr ? 0 : this->parent->element) << " [" << this->parent << "]" << " sup: "
+         << this->support << endl << "D({";
     for(auto it = this->diff_set.begin(); it != this->diff_set.end(); ++it) {
         cout << *it << ", ";
     }

@@ -289,7 +289,8 @@ void traverse(node *pNode)
                 new_node->element = (*b_it)->element;
                 new_node->support = sup;
                 tree.add(new_node, *it);
-                cout << "Added: " << new_node->element << " to " << new_node->parent->element << endl;
+                cout << "Added: " << new_node->element << " at level: " << new_node->level << " to "
+                     << new_node->parent->element << " from level: " << new_node->parent->level << endl;
             } else {
                 delete new_node;
             }
@@ -361,5 +362,7 @@ int main(int argc, const char **argv)
     //First level
     create_first_level_diff_sets();
     traverse(tree.root);
+    cout << "------------" << endl;
+    tree.print(tree.root);
     return 0;
 }

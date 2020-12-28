@@ -8,6 +8,7 @@
 #include <string>
 #include <set>
 #include <vector>
+#include <unordered_map>
 
 struct node
 {
@@ -25,8 +26,11 @@ struct node
 struct tree
 {
     node *root;
+    std::unordered_map<node *, bool> visited;
 
     void add(node *current_node, node *parent_node);
+
+    void print(node *pNode);
 };
 
 
