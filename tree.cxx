@@ -14,6 +14,9 @@ void tree::add(node *current_node, node *parent_node)
     if(parent_node != nullptr) {
         parent_node->children.push_back(current_node);
         current_node->level = parent_node->level + 1;
+        if(current_node->level > this->max_level) {
+            this->max_level = current_node->level;
+        }
     }
 }
 
@@ -32,7 +35,7 @@ void tree::print(node *pNode)
 
 void tree::print()
 {
-    visited.clear();
+    //visited.clear();
     print(root);
 }
 
@@ -41,11 +44,13 @@ void tree::print_frequent_itemset(const std::string &file)
     string ascendant = "";
     ofstream myfile;
     if(file != "") {
-        myfile.open(file);
-        if(myfile.failbit) {
+        myfile.open(file, fstream::out | fstream::trunc);
+        if(!myfile) {
             cout << "Cannot open file: " << file << endl << "Results will not be saved and be printed at stdio instead"
                  << endl;
             myfile.close();
+        } else {
+            myfile << "length, sup, discovered_frequent_itemset" << endl;
         }
     }
 
@@ -58,6 +63,9 @@ void tree::print_frequent_itemset(const std::string &file)
 void tree::print_frequent_itemset(node *pNode, std::string all_ascendats, ofstream &file)
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
+        if(pNode->level == this->max_level) {
+            ++number_of_items_of_greatest_cardinality;
+        }
         ////format: length, sup, discovered_frequent_itemset
         string parent = all_ascendats;
         if((*it)->level > 1) {

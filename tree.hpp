@@ -34,7 +34,9 @@ struct node
 struct tree
 {
     node *root;
-    std::unordered_map<node *, bool> visited;
+    //std::unordered_map<node *, bool> visited; //Needed for graph not needed for tree
+    unsigned int max_level = 0;
+    unsigned int number_of_items_of_greatest_cardinality = 0; //the number of items in a discovered frequent itemset of the greatest cardinality
 
     void add(node *current_node, node *parent_node);
 

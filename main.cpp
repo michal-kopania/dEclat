@@ -1,9 +1,9 @@
 #include <iostream>
 #include <boost/program_options.hpp>
 #include <unordered_map>
-#include "tree.hpp"
 #include <fstream>
 #include <sys/time.h>
+#include "tree.hpp"
 
 #define DEBUG_LEVEL 0
 
@@ -16,7 +16,11 @@ std::unordered_map<unsigned int, unsigned int> taxonomy, parent_taxonomy;
 std::unordered_map<unsigned int, std::set<unsigned int>> vertical_representation;
 tree tree;
 unsigned int number_of_transactions = 0;
-
+vector<string> stat_data;
+unsigned int number_of_created_candidates = 0; //total # of created candidates,
+unsigned int number_of_frequent_itemsets = 0;// total # of discovered frequent itemsets
+std::map<unsigned int, pair<unsigned int, unsigned int>> number_of_created_candidates_and_frequent_itemsets_of_length;
+//- # of created candidates of length 1, total # of discovered frequent itemsets of length 1
 
 double get_wall_time()
 {
@@ -170,12 +174,16 @@ int read_dataset(const string &filename, bool use_taxonomy)
 #endif
     //Remove infrequent items from vertical representation
     // erase all with support <= min_sup
+    number_of_created_candidates = vertical_representation.size();
     for(auto it = vertical_representation.begin(); it != vertical_representation.end();) {
         if(it->second.size() <= min_sup)
             it = vertical_representation.erase(it);
         else
             ++it;
     }
+    number_of_frequent_itemsets = vertical_representation.size();
+    number_of_created_candidates_and_frequent_itemsets_of_length[1] = pair(number_of_created_candidates,
+                                                                           number_of_frequent_itemsets);
 #if DLEVEL > 0
     cout << endl << "After removing <= min_sup" << endl;
     std::for_each(vertical_representation.cbegin(), vertical_representation.cend(), print);
@@ -304,6 +312,19 @@ void traverse(node *pNode)
         brother++;
         for(auto b_it = brother; b_it != pNode->children.end(); ++b_it) {
             //Go deeper and create and calculate next level
+            //For statistics
+            ++number_of_created_candidates;
+            auto child_level = (*it)->level + 1;
+            auto search = number_of_created_candidates_and_frequent_itemsets_of_length.find(child_level);
+            std::pair<std::map<unsigned int, pair<unsigned int, unsigned int>>::iterator, bool> inserted;
+            if(search == number_of_created_candidates_and_frequent_itemsets_of_length.end()) {
+                inserted = number_of_created_candidates_and_frequent_itemsets_of_length.emplace(child_level,
+                                                                                                pair(1, 0));
+                search = inserted.first;
+            } else {
+                (*search).second.first++;
+            }
+
             node *new_node;
             new_node = new node;
             //D(ab) = D(b) - D(a)
@@ -314,6 +335,8 @@ void traverse(node *pNode)
             //Calculate sup
             auto sup = (*it)->support - new_node->diff_set.size();
             if(sup > min_sup) {
+                ++number_of_frequent_itemsets;
+                (*search).second.second++;
                 new_node->element = (*b_it)->element;
                 new_node->support = sup;
                 tree.add(new_node, *it);
@@ -331,6 +354,7 @@ void traverse(node *pNode)
 
 int main(int argc, const char **argv)
 {
+    auto start_time = get_wall_time();
     // Declare the supported options.
     po::options_description desc("Allowed options");
     desc.add_options()
@@ -354,6 +378,7 @@ int main(int argc, const char **argv)
         min_sup = vm["min_sup"].as<int>();
         cout << "Minimum support level was set to "
              << min_sup << ".\n";
+        stat_data.push_back("minSup: " + to_string(min_sup));
     } else {
         cout << "Minimum support was not set. Provide as an argument --min_sup=2\n";
         return 1;
@@ -363,6 +388,7 @@ int main(int argc, const char **argv)
         data_filename = vm["data_set"].as<string>();
         cout << "data_set was set to "
              << data_filename << ".\n";
+        stat_data.push_back("name of the transaction dataset: " + data_filename);
     } else {
         cout << "Argument data_set was not provided. Provide as filename to data --data_set=data.txt\n";
         return 1;
@@ -391,6 +417,7 @@ int main(int argc, const char **argv)
         taxonomy_filename = vm["taxonomy"].as<string>();
         cout << "taxonomy was set to "
              << taxonomy_filename << ".\n";
+        stat_data.push_back("name of the hierarchy dataset: " + taxonomy_filename);
         auto s = get_wall_time();
         //cout<<"reading the hierarchy datasets start: "<<s<<endl;
         if(read_taxonomy(taxonomy_filename) < 0) {
@@ -399,22 +426,72 @@ int main(int argc, const char **argv)
         auto e = get_wall_time();
         cout << "reading the hierarchy datasets: " << e - s << " sec." << endl;
         use_taxonomy = true;
+        stat_data.push_back("reading the hierarchy datasets: " + to_string(e - s) + " sec.");
     } else {
         use_taxonomy = false;
         cout
                 << "Argument taxonomy was not provided. Calculation will be performed without hierarchy. To calculate dEclat with hierarchy, provide taxonomy filename --taxonomy=taxonomy_data.txt\n";
     }
 
+    auto s = get_wall_time();
     read_dataset(data_filename, use_taxonomy);
+    auto e = get_wall_time();
+    cout << "reading and extending the dataset with transactions with hierarchical items: " << e - s << " sec." << endl;
+    stat_data.push_back(
+            "reading and extending the dataset with transactions with hierarchical items: " + to_string(e - s) +
+            " sec.");
 
     //First level
+    s = get_wall_time();
     create_first_level_diff_sets();
+    e = get_wall_time();
+    cout << "creation of diffLists for singleton itemsets: " << e - s << " sec." << endl;
+    stat_data.push_back("creation of diffLists for singleton itemsets: " + to_string(e - s) + " sec.");
+
+    s = get_wall_time();
     traverse(tree.root);
+    e = get_wall_time();
+    cout << "creation of candidates for frequent itemsets as well as calculation of their diffLists and supports: "
+         << e - s << " sec." << endl;
+    stat_data.push_back(
+            "creation of candidates for frequent itemsets as well as calculation of their diffLists and supports: " +
+            to_string(e - s) + " sec.");
 #if DLEVEL > 1
     cout << "------------ SEARCH TREE ------------" << endl;
     tree.print();
     cout << "-------------------------------------" << endl;
 #endif
+
+    s = get_wall_time();
     tree.print_frequent_itemset(out_filename);
+    ofstream myfile;
+    if(stat_filename != "") {
+        myfile.open(stat_filename, fstream::out | fstream::trunc);
+        if(!myfile) {
+            cout << "Cannot open file: " << stat_filename << endl << "STATs will not be saved"
+                 << endl;
+            myfile.close();
+        } else {
+            for(auto it = stat_data.begin(); it != stat_data.end(); ++it) {
+                myfile << (*it) << endl;
+            }
+        }
+    }
+    e = get_wall_time();
+    if(myfile.is_open()) {
+        myfile << "saving results to OUT and STAT files: " << e - s << " sec." << endl;
+        myfile << "total runtime: " << e - start_time << " sec." << endl;
+        myfile << "the number of items in a discovered frequent itemset of the greatest cardinality: "
+               << tree.number_of_items_of_greatest_cardinality << endl;
+        myfile << "total # of created candidates: " << number_of_created_candidates << endl;
+        myfile << "total # of discovered frequent itemsets: " << number_of_frequent_itemsets << endl;
+        for(auto it = number_of_created_candidates_and_frequent_itemsets_of_length.begin();
+            it != number_of_created_candidates_and_frequent_itemsets_of_length.end(); ++it) {
+            myfile << "# of created candidates of length " << (*it).first << ": " << (*it).second.first
+                   << " total # of discovered frequent itemsets: " << (*it).second.second << endl;
+        }
+        myfile.close();
+    }
+    cout << "saving results to OUT and STAT files: " << e - s << " sec." << endl;
     return 0;
 }
