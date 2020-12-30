@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include "tree.hpp"
+#include <fstream>
 
 using namespace std;
 
@@ -18,13 +19,57 @@ void tree::add(node *current_node, node *parent_node)
 
 void tree::print(node *pNode)
 {
-    visited[pNode] = true;
+    //visited[pNode] = true;
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         (*it)->print();
-        auto search = visited.find(*it);
-        if(search == visited.end()) {
+        //  auto search = visited.find(*it);
+        //if(search == visited.end()) {
             this->print((*it));
+        //}
+    }
+}
+
+
+void tree::print()
+{
+    visited.clear();
+    print(root);
+}
+
+void tree::print_frequent_itemset(const std::string &file)
+{
+    string ascendant = "";
+    ofstream myfile;
+    if(file != "") {
+        myfile.open(file);
+        if(myfile.failbit) {
+            cout << "Cannot open file: " << file << endl << "Results will not be saved and be printed at stdio instead"
+                 << endl;
+            myfile.close();
         }
+    }
+
+    this->print_frequent_itemset(this->root, ascendant, myfile);
+    if(myfile.is_open()) {
+        myfile.close();
+    }
+}
+
+void tree::print_frequent_itemset(node *pNode, std::string all_ascendats, ofstream &file)
+{
+    for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
+        ////format: length, sup, discovered_frequent_itemset
+        string parent = all_ascendats;
+        if((*it)->level > 1) {
+            parent += ", ";
+        }
+        parent += to_string((*it)->element);
+        if(file.is_open()) {
+            file << (*it)->level << ", " << (*it)->support << ", {" << parent << "}" << endl;
+        } else {
+            cout << (*it)->level << ", " << (*it)->support << ", {" << parent << "}" << endl;
+        }
+        this->print_frequent_itemset((*it), parent, file);
     }
 }
 

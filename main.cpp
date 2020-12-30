@@ -5,15 +5,18 @@
 #include <fstream>
 #include <sys/time.h>
 
+#define DEBUG_LEVEL 0
+
 using namespace std;
 namespace po = boost::program_options;
 
-std::string out_filename, stat_filename, data_filename, taxonomy_filename = "";
+std::string out_filename = "", stat_filename = "", data_filename, taxonomy_filename = "";
 unsigned int min_sup;
 std::unordered_map<unsigned int, unsigned int> taxonomy, parent_taxonomy;
 std::unordered_map<unsigned int, std::set<unsigned int>> vertical_representation;
 tree tree;
 unsigned int number_of_transactions = 0;
+
 
 double get_wall_time()
 {
@@ -64,19 +67,26 @@ int read_taxonomy(const string &taxonomy_filename)
             if(search->second == 0) {
                 search->second = parent;
             }
-            //std::cout << search->first << " -> " << parent_taxonomy.at(search->first) << endl;
+#if DLEVEL > 1
+            std::cout << search->first << " -> " << parent_taxonomy.at(search->first) << endl;
+#endif
         } else {
             search = parent_taxonomy.find(parent);
             if(search == parent_taxonomy.end()) {
                 parent_taxonomy.emplace(parent, 0);
             }
         }
-        //cout<<element<<","<<parent<<endl;
+#if DLEVEL > 1
+        cout<<element<<","<<parent<<endl;
+#endif
     }
+#if DLEVEL > 0
     auto print = [](std::pair<const unsigned int, unsigned int> &n) {
         std::cout << " " << n.first << '(' << n.second << ')';
     };
     std::for_each(parent_taxonomy.begin(), parent_taxonomy.end(), print);
+#endif
+
     return 1;
 }
 
@@ -98,19 +108,27 @@ int read_dataset(const string &filename, bool use_taxonomy)
             continue;
         }
         ++t_id;
+#if DLEVEL > 0
         cout << "[" << t_id << "] ";
+#endif
         while(getline(linestream, value, ' ')) {
             element = std::stoul(value, nullptr, 0);
+#if DLEVEL > 0
             cout << element;
+#endif
             auto inserted = vertical_representation[element].insert(t_id);
             if(use_taxonomy) {
                 auto search = taxonomy.find(element);
                 if(search != taxonomy.end()) {
-                    //      std::cout << "Found " << search->first << " " << search->second << '\n';
+#if DLEVEL > 1
+                    std::cout << "Found " << search->first << " " << search->second << '\n';
+#endif
                     while(true) {
                         search = parent_taxonomy.find(search->second);
                         if(search != taxonomy.end()) {
-                            //std::cout << " -> " << search->first ;// << " " << search->second << '\n';
+#if DLEVEL > 1
+                            std::cout << " -> " << search->first ;// << " " << search->second << '\n';
+#endif
                             parent_elements.emplace(search->first);
                             vertical_representation[search->first].insert(t_id);
                         } else {
@@ -118,21 +136,27 @@ int read_dataset(const string &filename, bool use_taxonomy)
                         }
                     }
                 } else {
-                    //      std::cout << "Not found\n";
+#if DLEVEL > 1
+                    std::cout << "Not found\n";
+#endif
                 }
             }
+#if DLEVEL > 0
             cout << ", ";
+#endif
         }
         //elements of transaction printed out
-        //cout<<endl;
+#if DLEVEL > 0
         if(use_taxonomy) {
             std::for_each(parent_elements.cbegin(), parent_elements.cend(), [](unsigned int x) {
                 std::cout << x << "; "; //printing parents from hierarchy
             });
         }
         cout << endl; //elements and taxonomy printed. Get next transaction
+#endif
     }
     number_of_transactions = t_id;
+#if DLEVEL > 0
     //Lets print it out
     auto print = [](const std::pair<const unsigned int, std::set<unsigned int>> &s) {
         std::cout << "item " << s.first << " in transactions (";
@@ -143,7 +167,7 @@ int read_dataset(const string &filename, bool use_taxonomy)
     };
 
     std::for_each(vertical_representation.cbegin(), vertical_representation.cend(), print);
-
+#endif
     //Remove infrequent items from vertical representation
     // erase all with support <= min_sup
     for(auto it = vertical_representation.begin(); it != vertical_representation.end();) {
@@ -152,9 +176,10 @@ int read_dataset(const string &filename, bool use_taxonomy)
         else
             ++it;
     }
+#if DLEVEL > 0
     cout << endl << "After removing <= min_sup" << endl;
     std::for_each(vertical_representation.cbegin(), vertical_representation.cend(), print);
-
+#endif
     return 1;
 }
 
@@ -208,6 +233,7 @@ void create_first_level_diff_sets()
         tree.add(singleton, root_node);
 
         //Debug print
+#if DLEVEL > 0
         cout << endl << "Transactions for: " << it->first << endl;
         for(auto s_it = it->second.begin(); s_it != it->second.end(); ++s_it) {
             cout << *s_it << ", ";
@@ -217,7 +243,7 @@ void create_first_level_diff_sets()
             cout << *d_it << ", ";
         }
         cout << endl;
-
+#endif
     }
 
 }
@@ -271,7 +297,9 @@ void difference(const std::set<unsigned int> &diff_set1, const std::set<unsigned
 void traverse(node *pNode)
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
+#if DEBUG_LEVEL > 1
         (*it)->print();
+#endif
         auto brother = it;
         brother++;
         for(auto b_it = brother; b_it != pNode->children.end(); ++b_it) {
@@ -289,8 +317,10 @@ void traverse(node *pNode)
                 new_node->element = (*b_it)->element;
                 new_node->support = sup;
                 tree.add(new_node, *it);
+#if DLEVEL > 1
                 cout << "Added: " << new_node->element << " at level: " << new_node->level << " to "
                      << new_node->parent->element << " from level: " << new_node->parent->level << endl;
+#endif
             } else {
                 delete new_node;
             }
@@ -338,6 +368,24 @@ int main(int argc, const char **argv)
         return 1;
     }
 
+    if(vm.count("out")) {
+        out_filename = vm["out"].as<string>();
+        cout << "out was set to "
+             << out_filename << ".\n";
+    } else {
+        cout
+                << "Argument out was not provided. If you want output to be saved to file, provide filename as argument --out=out.txt\n";
+    }
+
+    if(vm.count("stat")) {
+        stat_filename = vm["stat"].as<string>();
+        cout << "stat was set to "
+             << stat_filename << ".\n";
+    } else {
+        cout
+                << "Argument stat was not provided. If you want stats to be saved to file, provide filename as argument --stat=stat.txt\n";
+    }
+
     bool use_taxonomy;
     if(vm.count("taxonomy")) {
         taxonomy_filename = vm["taxonomy"].as<string>();
@@ -362,7 +410,11 @@ int main(int argc, const char **argv)
     //First level
     create_first_level_diff_sets();
     traverse(tree.root);
-    cout << "------------" << endl;
-    tree.print(tree.root);
+#if DLEVEL > 1
+    cout << "------------ SEARCH TREE ------------" << endl;
+    tree.print();
+    cout << "-------------------------------------" << endl;
+#endif
+    tree.print_frequent_itemset(out_filename);
     return 0;
 }

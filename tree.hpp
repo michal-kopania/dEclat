@@ -21,6 +21,14 @@ struct node
     //std::string name;
 
     void print();
+
+    virtual ~node()
+    {
+        for(auto it = children.begin(); it != children.end(); ++it) {
+            delete *it;
+        }
+    }
+
 };
 
 struct tree
@@ -30,7 +38,20 @@ struct tree
 
     void add(node *current_node, node *parent_node);
 
+    void print();
+
+    //format: length, sup, discovered_frequent_itemset
+    void print_frequent_itemset(const std::string &file);
+
+    virtual ~tree()
+    {
+        delete root;
+    }
+
+private:
     void print(node *pNode);
+
+    void print_frequent_itemset(node *pNode, std::string all_ascendats, std::ofstream &file);
 };
 
 
