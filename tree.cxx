@@ -2,9 +2,7 @@
 // Created by mic on 12/20/20.
 //
 
-#include <iostream>
 #include "tree.hpp"
-#include <fstream>
 
 using namespace std;
 
@@ -44,13 +42,13 @@ void tree::print_frequent_itemset(const std::string &file)
     string ascendant = "";
     ofstream myfile;
     if(file != "") {
-        myfile.open(file, fstream::out | fstream::trunc);
+        myfile.open(file, fstream::out | fstream::app);
         if(!myfile) {
             cout << "Cannot open file: " << file << endl << "Results will not be saved and be printed at stdio instead"
                  << endl;
             myfile.close();
         } else {
-            myfile << "length, sup, discovered_frequent_itemset" << endl;
+            //myfile << "length, sup, discovered_frequent_itemset" << endl;
         }
     }
 
@@ -63,7 +61,7 @@ void tree::print_frequent_itemset(const std::string &file)
 void tree::print_frequent_itemset(node *pNode, std::string all_ascendats, ofstream &file)
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
-        if(pNode->level == this->max_level) {
+        if((*it)->level == this->max_level) {
             ++number_of_items_of_greatest_cardinality;
         }
         ////format: length, sup, discovered_frequent_itemset

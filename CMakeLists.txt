@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.18)
 project(dEclat)
 
 set(CMAKE_CXX_STANDARD 17)
-add_executable(dEclat main.cpp tree.cxx tree.hpp)
+add_executable(dEclat main.cpp tree.cxx tree.hpp taxonomy_tree.cxx taxonomy_tree.hpp)
 
 find_package(Boost REQUIRED COMPONENTS system program_options)
 
