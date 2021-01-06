@@ -7,7 +7,7 @@
 using namespace std;
 
 extern unsigned int number_of_transactions;
-
+extern unsigned min_sup;
 extern void common(const std::set<unsigned int> &diff_set1, const std::set<unsigned int> &diff_set2,
                    std::set<unsigned int> &result);
 
@@ -101,7 +101,7 @@ void taxonomy_tree::set_sup_from_vertical_representation(taxonomy_node *pNode)
         if(search != vertical_representation->end()) {
             pNode->support = search->second.size();
             pNode->transaction_ids = search->second; //copy. Its safer that way. Can be optimized
-            //Copy from tree
+            //Copy from first level of tree
             for(auto it = tree.root->children.begin(); it != tree.root->children.end(); ++it) {
                 if((*it)->element == pNode->element) {
                     pNode->diff_set = (*it)->diff_set; //copy.  Its safer. Can be optimized
@@ -140,7 +140,7 @@ void taxonomy_tree::set_sup_from_children(taxonomy_node *pNode)
     }
     pNode->support = pNode->transaction_ids.size();
     //diff_set can be used instead of transactions_ids
-    pNode->calculate_diff_set_from_children(); //Also calculates support
+    //pNode->calculate_diff_set_from_children(); //May also calculate support
 
 //    if(!pNode->children.empty()){
 //         pNode->print();
@@ -205,6 +205,9 @@ void taxonomy_node::merge_transaction_ids(const std::set<unsigned int> &with_set
 
 void taxonomy_node::calculate_diff_set_from_children()
 {
+#if DEBUG_LEVEL > 0
+    cout << endl << this->element << " # of children: " << this->children.size() << endl;
+#endif
     if(this->children.empty()) {
         return;
     }
@@ -216,10 +219,11 @@ void taxonomy_node::calculate_diff_set_from_children()
     if(this->children.size() == 1) {
         auto it = this->children.begin();
         this->diff_set = (*it)->diff_set;
-    } else {
+        this->support = (*it)->support;
 #if DEBUG_LEVEL > 0
-        cout << endl << this->element << " # of children: " << this->children.size() << endl;
+        cout << "==1 sup from tids: " << this->support << endl;
 #endif
+    } else {
         //pNode diff_set is common part of all children
         //Find intersection with all children
         auto size = children.size();
@@ -231,9 +235,12 @@ void taxonomy_node::calculate_diff_set_from_children()
 //        for(int i=0;i<size;++i){
 //            finished[i] = false;
 //        }
-
+//        unsigned int max_diff_set_size = 0;
         int i = 0;
         for(auto it = children.begin(); it != children.end(); ++it) {
+//            if(max_diff_set_size < (*it)->diff_set.size()){
+//                max_diff_set_size = (*it)->diff_set.size();
+//            }
             iter[i] = (*it)->diff_set.begin();
             ++i;
         }
@@ -278,11 +285,12 @@ void taxonomy_node::calculate_diff_set_from_children()
                 break;
             }
         }
-    }
 #if DEBUG_LEVEL > 0
-    cout << "sup from tids: " << this->support << " sup from diffs:" << number_of_transactions - this->diff_set.size()
-         << endl;
+        cout << "sup from tids: " << this->support << endl;
 #endif
+//        This formula is NOT correct.
+//        this->support = max_diff_set_size - this->diff_set.size();
+    }
 }
 
 
@@ -322,7 +330,7 @@ taxonomy_tree::print_frequent_itemset(taxonomy_node *pNode, std::string all_asce
     }
     //For STATS
     ++number_of_created_candidates;
-    ++number_of_frequent_itemsets;
+
     auto search = number_of_created_candidates_and_frequent_itemsets_of_length.find(level);
     std::pair<std::map<unsigned int, pair<unsigned int, unsigned int>>::iterator, bool> inserted;
     if(search == number_of_created_candidates_and_frequent_itemsets_of_length.end()) {
@@ -332,19 +340,22 @@ taxonomy_tree::print_frequent_itemset(taxonomy_node *pNode, std::string all_asce
     } else {
         (*search).second.first++; //Increase number of candidates
     }
-    (*search).second.second++;
-    //For STATS end
+    if(pNode->support > min_sup) {
+        ++number_of_frequent_itemsets;
+        (*search).second.second++; //Increase number of frequent_itemsets
+        //For STATS end
 
-    if(level > 1) {
-        parent += ", ";
-    }
+        if(level > 1) {
+            parent += "->";
+        }
 
-    parent += to_string(pNode->element);
+        parent += to_string(pNode->element);
 
-    if(file.is_open()) {
-        file << level << "\t" << pNode->support << "\t" << parent << "" << endl;
-    } else {
-        cout << level << "\t" << pNode->support << "\t" << parent << "" << endl;
+        if(file.is_open()) {
+            file << level << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
+        } else {
+            cout << level << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
+        }
     }
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         this->print_frequent_itemset((*it), parent, file, level);

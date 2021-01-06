@@ -13,7 +13,7 @@
 #include <map>
 #include "tree.hpp"
 
-extern std::unordered_map<unsigned int, std::set<unsigned int>> *vertical_representation;
+extern std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation;
 extern unsigned int number_of_frequent_itemsets;
 extern unsigned int number_of_created_candidates;
 extern std::map<unsigned int, std::pair<unsigned int, unsigned int>> number_of_created_candidates_and_frequent_itemsets_of_length; //For stats
@@ -77,6 +77,11 @@ struct taxonomy_tree
      * Roots are stored in roots variable. parent node is nullptr
      */
     std::unordered_map<unsigned int, taxonomy_node *> roots; //Needed for constructing tree from flat (node,parent) list
+
+    /**
+     * @brief vertical representation created from taxonomy_tree All except leafs
+     */
+    std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation;
 
     /**
      * @brief adds current_element to tree making its parent parent_element.

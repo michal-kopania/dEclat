@@ -18,7 +18,7 @@ unsigned int min_sup;
 std::unordered_map<unsigned int, unsigned int> taxonomy; // Read from taxonomy file
 taxonomy_tree hierarchy_tree;
 /*For each item I look for its parent in taxonomy. I have noticed, that hierarchy at the botton level has many leafs, but at the level up number of leaves is very small. That’s why I have second set - parent_taxonomy. When I look for parent of item in dataset I search taxonomy, but to search for its parent I search in parent_taxonomy structure. It is faster that way.*/
-std::unordered_map<unsigned int, std::set<unsigned int>> *vertical_representation;
+std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation;
 struct tree tree;
 unsigned int number_of_transactions = 0;
 vector<string> stat_data; //Info to be saved in stat file.
@@ -203,6 +203,14 @@ int read_dataset(const string &filename, bool use_taxonomy)
     //Remove infrequent items from vertical representation
     // erase all with support <= min_sup
     number_of_created_candidates = vertical_representation->size();
+    for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
+        if(it->second.size() > min_sup) {
+            ++number_of_frequent_itemsets;
+        }
+    }
+    number_of_created_candidates_and_frequent_itemsets_of_length[1] = pair(number_of_created_candidates,
+                                                                           number_of_frequent_itemsets);
+    /* Wersja z usuwaniem z vertical_representation. Jeśli tu usuwam, to nie pracować z taxonomy
     for(auto it = vertical_representation->begin(); it != vertical_representation->end();) {
         if(it->second.size() <= min_sup)
             it = vertical_representation->erase(it);
@@ -216,18 +224,20 @@ int read_dataset(const string &filename, bool use_taxonomy)
     cout << endl << "After removing <= min_sup" << endl;
     std::for_each(vertical_representation->cbegin(), vertical_representation->cend(), print);
 #endif
+     */
     return 1;
 }
 
 /**
  * First level has singletons itemsets
  */
-void create_first_level_diff_sets()
+void create_first_level_diff_sets(struct tree &t,
+                                  std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation)
 {
     node *root_node;
     root_node = new node;
-    tree.add(root_node, nullptr);
-    tree.root = root_node;
+    t.add(root_node, nullptr);
+    t.root = root_node;
 
     for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
         //it->second.size() it is support
@@ -269,7 +279,7 @@ void create_first_level_diff_sets()
             diff_set_it = singleton->diff_set.end();
         }
 
-        tree.add(singleton, root_node);
+        t.add(singleton, root_node);
 
         //Debug print
 #if DEBUG_LEVEL > 0
@@ -338,51 +348,56 @@ void traverse(node *pNode)
 #if DEBUG_LEVEL > 1
         (*it)->print();
 #endif
-        auto brother = it;
-        brother++; //For all right hand brothers
-        for(auto b_it = brother; b_it != pNode->children.end(); ++b_it) {
-            //Go deeper and create and calculate next level
-            //For statistics
-            ++number_of_created_candidates;
-            auto child_level = (*it)->level + 1;
-            std::cout << number_of_created_candidates << "," << number_of_frequent_itemsets << "\r" << std::flush;
+        if((*it)->support > min_sup) {
+            auto brother = it;
+            brother++; //For all right hand brothers
+            for(auto b_it = brother; b_it != pNode->children.end(); ++b_it) {
+                if((*b_it)->support <= min_sup) {
+                    continue;
+                }
+                //Go deeper and create and calculate next level
+                //For statistics
+                ++number_of_created_candidates;
+                auto child_level = (*it)->level + 1;
+                std::cout << number_of_created_candidates << "," << number_of_frequent_itemsets << "\r" << std::flush;
 #if DEBUG_LEVEL > 1
-            cout<<" L: "<<(*it)->level<<" item: "<<(*it)->element<<" brother:"<<(*b_it)->element<<endl;
+                cout<<" L: "<<(*it)->level<<" item: "<<(*it)->element<<" brother:"<<(*b_it)->element<<endl;
 #endif
-            auto search = number_of_created_candidates_and_frequent_itemsets_of_length.find(child_level);
-            std::pair<std::map<unsigned int, pair<unsigned int, unsigned int>>::iterator, bool> inserted;
-            if(search == number_of_created_candidates_and_frequent_itemsets_of_length.end()) {
-                inserted = number_of_created_candidates_and_frequent_itemsets_of_length.emplace(child_level,
-                                                                                                pair(1, 0));
-                search = inserted.first;
-            } else {
-                (*search).second.first++; //Increase number of candidates
-            }
+                auto search = number_of_created_candidates_and_frequent_itemsets_of_length.find(child_level);
+                std::pair<std::map<unsigned int, pair<unsigned int, unsigned int>>::iterator, bool> inserted;
+                if(search == number_of_created_candidates_and_frequent_itemsets_of_length.end()) {
+                    inserted = number_of_created_candidates_and_frequent_itemsets_of_length.emplace(child_level,
+                                                                                                    pair(1, 0));
+                    search = inserted.first;
+                } else {
+                    (*search).second.first++; //Increase number of candidates
+                }
 
-            node *new_node;
-            new_node = new node;
-            //D(ab) = D(b) - D(a)
-            //D(ab) = T(a) - T(b)
-            //I have diff list, so
-            difference((*b_it)->diff_set, (*it)->diff_set, new_node->diff_set);
-            //if sup > minSup add to tree
-            //Calculate sup sup(a) - len(D(ab))
-            auto sup = (*it)->support - new_node->diff_set.size();
-            if(sup > min_sup) {
-                ++number_of_frequent_itemsets;
-                (*search).second.second++; //Increase number of number_of_created_candidates_and_frequent_itemsets_of_length[level].second (which is frequent), first is candidate
-                new_node->element = (*b_it)->element;
-                new_node->support = sup;
-                tree.add(new_node, *it);
+                node *new_node;
+                new_node = new node;
+                //D(ab) = D(b) - D(a)
+                //D(ab) = T(a) - T(b)
+                //I have diff list, so
+                difference((*b_it)->diff_set, (*it)->diff_set, new_node->diff_set);
+                //if sup > minSup add to tree
+                //Calculate sup sup(a) - len(D(ab))
+                auto sup = (*it)->support - new_node->diff_set.size();
+                if(sup > min_sup) {
+                    ++number_of_frequent_itemsets;
+                    (*search).second.second++; //Increase number of number_of_created_candidates_and_frequent_itemsets_of_length[level].second (which is frequent), first is candidate
+                    new_node->element = (*b_it)->element;
+                    new_node->support = sup;
+                    tree.add(new_node, *it);
 #if DEBUG_LEVEL > 0
-                cout << "Added: " << new_node->element << " at level: " << new_node->level << " to "
-                     << new_node->parent->element << " from level: " << new_node->parent->level << endl;
+                    cout << "Added: " << new_node->element << " at level: " << new_node->level << " to "
+                         << new_node->parent->element << " from level: " << new_node->parent->level << endl;
 #endif
-            } else {
-                delete new_node;
+                } else {
+                    delete new_node;
+                }
             }
+            traverse((*it));
         }
-        traverse((*it));
     }
 }
 
@@ -491,7 +506,7 @@ int main(int argc, const char **argv)
     }
 
 
-    vertical_representation = new std::unordered_map<unsigned int, std::set<unsigned int>>;
+    vertical_representation = new std::unordered_map<unsigned int, std::set<unsigned int> *>;
     auto s = get_wall_time();
     read_dataset(data_filename, use_taxonomy);
     auto e = get_wall_time();
@@ -502,7 +517,7 @@ int main(int argc, const char **argv)
 
     //First level
     s = get_wall_time();
-    create_first_level_diff_sets();
+    create_first_level_diff_sets(tree, vertical_representation);
 
     //To save some memory
     e = get_wall_time();
