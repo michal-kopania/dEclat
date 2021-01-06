@@ -11,7 +11,7 @@ extern unsigned min_sup;
 extern void common(const std::set<unsigned int> &diff_set1, const std::set<unsigned int> &diff_set2,
                    std::set<unsigned int> &result);
 
-#define DEBUG_LEVEL 1
+#define DEBUG_LEVEL 0
 
 void taxonomy_tree::add(unsigned int current_element, unsigned int parent_element)
 {
@@ -81,26 +81,28 @@ void taxonomy_tree::print(taxonomy_node *pNode)
 }
 
 
-void taxonomy_tree::set_sup_from_vertical_representation()
+void taxonomy_tree::set_sup_from_vertical_representation(
+        std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation)
 {
     for(auto it = roots.begin(); it != roots.end(); ++it) {
-        set_sup_from_vertical_representation((*it).second);
+        set_sup_from_vertical_representation((*it).second, vertical_representation);
     }
 }
 
-void taxonomy_tree::set_sup_from_vertical_representation(taxonomy_node *pNode)
+void taxonomy_tree::set_sup_from_vertical_representation(taxonomy_node *pNode,
+                                                         std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation)
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         if((*it) != nullptr) {
-            this->set_sup_from_vertical_representation((*it));
+            this->set_sup_from_vertical_representation((*it), vertical_representation);
         }
     }
     if(pNode->children.empty()) {
         //pNode is a leaf
         auto search = vertical_representation->find(pNode->element);
         if(search != vertical_representation->end()) {
-            pNode->support = search->second.size();
-            pNode->transaction_ids = search->second; //copy. Its safer that way. Can be optimized
+            pNode->support = search->second->size();
+            pNode->transaction_ids = *search->second; //copy. Its safer that way. Can be optimized
             //Copy from first level of tree
             for(auto it = tree.root->children.begin(); it != tree.root->children.end(); ++it) {
                 if((*it)->element == pNode->element) {
@@ -145,6 +147,29 @@ void taxonomy_tree::set_sup_from_children(taxonomy_node *pNode)
 //    if(!pNode->children.empty()){
 //         pNode->print();
 //    }
+}
+
+void taxonomy_tree::create_vertical_representation()
+{
+    if(tree_vertical_representation) {
+        delete tree_vertical_representation;
+    }
+    tree_vertical_representation = new std::unordered_map<unsigned int, std::set<unsigned int> *>;
+    for(auto it = roots.begin(); it != roots.end(); ++it) {
+        create_vertical_representation((*it).second);
+    }
+}
+
+void taxonomy_tree::create_vertical_representation(taxonomy_node *pNode)
+{
+    if(!pNode->children.empty()) {
+//        pNode->print();
+        tree_vertical_representation->insert_or_assign(pNode->element,
+                                                       &pNode->transaction_ids);//pointer to transaction_ids
+        for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
+            this->create_vertical_representation((*it));
+        }
+    }
 }
 
 taxonomy_node *taxonomy_tree::find(taxonomy_node *pNode, unsigned int element, bool &found)
@@ -352,9 +377,9 @@ taxonomy_tree::print_frequent_itemset(taxonomy_node *pNode, std::string all_asce
         parent += to_string(pNode->element);
 
         if(file.is_open()) {
-            file << level << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
+            file << "1" << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
         } else {
-            cout << level << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
+            cout << "1" << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
         }
     }
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
@@ -362,9 +387,10 @@ taxonomy_tree::print_frequent_itemset(taxonomy_node *pNode, std::string all_asce
     }
 }
 
-void taxonomy_tree::calculate_support()
+void
+taxonomy_tree::calculate_support(std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation)
 {
-    this->set_sup_from_vertical_representation();
+    this->set_sup_from_vertical_representation(vertical_representation);
 #if DEBUG_LEVEL > 0
     cout<<"------------- after set_sup_from_vertical_representation ------"<<endl;
     this->print();

@@ -13,7 +13,6 @@
 #include <map>
 #include "tree.hpp"
 
-extern std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation;
 extern unsigned int number_of_frequent_itemsets;
 extern unsigned int number_of_created_candidates;
 extern std::map<unsigned int, std::pair<unsigned int, unsigned int>> number_of_created_candidates_and_frequent_itemsets_of_length; //For stats
@@ -81,7 +80,13 @@ struct taxonomy_tree
     /**
      * @brief vertical representation created from taxonomy_tree All except leafs
      */
-    std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation;
+    std::unordered_map<unsigned int, std::set<unsigned int> *> *tree_vertical_representation = nullptr;
+
+    /**
+     * @brief constructs tree_vertical_representation property based on tree nodes except leafs
+     * This will be later on will be passed to dEclat algorithm
+     */
+    void create_vertical_representation();
 
     /**
      * @brief adds current_element to tree making its parent parent_element.
@@ -111,7 +116,7 @@ struct taxonomy_tree
      * @brief Calculates support for taxonomy tree. If element has support > min_support than a parent of element is in taxonomy tree and also all parents are in tree and their support is greater than min_sup
      * Calls set_sup_from_vertical_representation() and set_sup_from_children()
      */
-    void calculate_support();
+    void calculate_support(std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation);
 
     /**
      * Prints to file frequent (in fact all but leafs) elements from taxonomy tree
@@ -124,6 +129,10 @@ struct taxonomy_tree
         for(auto it = roots.begin(); it != roots.end(); ++it) {
             delete (*it).second;
         }
+
+        if(tree_vertical_representation) {
+            delete tree_vertical_representation;
+        }
     }
 
 private:
@@ -132,10 +141,13 @@ private:
      * Also sets transaction_ids (copy) from vertical_representation.
      * In vertical_representation variable we have except items also first level of parent of item
      */
-    void set_sup_from_vertical_representation();
+    void set_sup_from_vertical_representation(
+            std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation);
 
-    void set_sup_from_vertical_representation(taxonomy_node *pNode);
+    void set_sup_from_vertical_representation(taxonomy_node *pNode,
+                                              std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation);
 
+    void create_vertical_representation(taxonomy_node *pNode);
     /**
      * @brief sets support and transaction_ids property for tree nodes based on transaction_ids and support property from node's children.
      * transaction_ids are merged transaction_ids from children

@@ -7,7 +7,7 @@
 #include "tree.hpp"
 #include "taxonomy_tree.hpp"
 
-#define DEBUG_LEVEL 1
+#define DEBUG_LEVEL 0
 
 namespace fs = std::filesystem;
 using namespace std;
@@ -16,7 +16,7 @@ namespace po = boost::program_options;
 std::string out_filename = "", stat_filename = "", data_filename, taxonomy_filename = "";
 unsigned int min_sup;
 std::unordered_map<unsigned int, unsigned int> taxonomy; // Read from taxonomy file
-taxonomy_tree hierarchy_tree;
+taxonomy_tree *hierarchy_tree;
 /*For each item I look for its parent in taxonomy. I have noticed, that hierarchy at the botton level has many leafs, but at the level up number of leaves is very small. That’s why I have second set - parent_taxonomy. When I look for parent of item in dataset I search taxonomy, but to search for its parent I search in parent_taxonomy structure. It is faster that way.*/
 std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation;
 struct tree tree;
@@ -96,6 +96,7 @@ double get_cpu_time()
 
 int read_taxonomy(const string &taxonomy_filename)
 {
+    hierarchy_tree = new taxonomy_tree;
     fstream file(taxonomy_filename, ios::in);
     if(!file.is_open()) {
         cout << "File " << taxonomy_filename << " not found!" << endl;
@@ -120,7 +121,7 @@ int read_taxonomy(const string &taxonomy_filename)
         }
         taxonomy.emplace(element, parent);
 
-        hierarchy_tree.add(element, parent);
+        hierarchy_tree->add(element, parent);
 
 #if DEBUG_LEVEL > 1
         cout<<element<<","<<parent<<endl;
@@ -164,7 +165,20 @@ int read_dataset(const string &filename, bool use_taxonomy)
 #if DEBUG_LEVEL > 0
             cout << element;
 #endif
-            auto inserted = (*vertical_representation)[element].insert(t_id);
+            //std::pair<std::map<unsigned int, set<unsigned int>::iterator, bool> inserted;
+            auto search = vertical_representation->find(element);
+            if(search != vertical_representation->end()) {
+                //std::cout << "Found " << search->first << " " << search->second << '\n';
+                search->second->insert(t_id);
+            } else {
+                //std::cout << "Not found\n";
+                std::set<unsigned int> *s;
+                s = new std::set<unsigned int>;
+                s->insert(t_id);
+                vertical_representation->insert_or_assign(element, s);// =
+            }
+
+            //auto inserted = (*vertical_representation)[element]->insert(t_id);
             if(use_taxonomy) {
 #if DEBUG_LEVEL > 0
                 auto search = taxonomy.find(element);
@@ -190,12 +204,12 @@ int read_dataset(const string &filename, bool use_taxonomy)
     number_of_transactions = t_id;
 #if DEBUG_LEVEL > 0
     //Lets print it out
-    auto print = [](const std::pair<const unsigned int, std::set<unsigned int>> &s) {
+    auto print = [](const std::pair<const unsigned int, std::set<unsigned int> *> &s) {
         std::cout << "item " << s.first << " in transactions (";
-        std::for_each(s.second.begin(), s.second.end(), [](unsigned int x) {
+        std::for_each(s.second->begin(), s.second->end(), [](unsigned int x) {
             std::cout << x << ' ';
         });
-        cout << ") size=" << s.second.size() << endl;
+        cout << ") size=" << s.second->size() << endl;
     };
 
     std::for_each(vertical_representation->cbegin(), vertical_representation->cend(), print);
@@ -204,27 +218,13 @@ int read_dataset(const string &filename, bool use_taxonomy)
     // erase all with support <= min_sup
     number_of_created_candidates = vertical_representation->size();
     for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
-        if(it->second.size() > min_sup) {
+        if(it->second->size() > min_sup) {
             ++number_of_frequent_itemsets;
         }
     }
     number_of_created_candidates_and_frequent_itemsets_of_length[1] = pair(number_of_created_candidates,
                                                                            number_of_frequent_itemsets);
-    /* Wersja z usuwaniem z vertical_representation. Jeśli tu usuwam, to nie pracować z taxonomy
-    for(auto it = vertical_representation->begin(); it != vertical_representation->end();) {
-        if(it->second.size() <= min_sup)
-            it = vertical_representation->erase(it);
-        else
-            ++it;
-    }
-    number_of_frequent_itemsets = vertical_representation->size();
-    number_of_created_candidates_and_frequent_itemsets_of_length[1] = pair(number_of_created_candidates,
-                                                                           number_of_frequent_itemsets);
-#if DEBUG_LEVEL > 0
-    cout << endl << "After removing <= min_sup" << endl;
-    std::for_each(vertical_representation->cbegin(), vertical_representation->cend(), print);
-#endif
-     */
+
     return 1;
 }
 
@@ -238,21 +238,26 @@ void create_first_level_diff_sets(struct tree &t,
     root_node = new node;
     t.add(root_node, nullptr);
     t.root = root_node;
-
+    cout << "create_first_level_diff_sets" << endl;
     for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
+        if(it->second->size() <= min_sup) {
+            continue;
+        }
+        cout << it->first << "    \r";
         //it->second.size() it is support
         node *singleton;
         singleton = new node;
         singleton->element = it->first;
-        singleton->support = it->second.size();
+        singleton->support = it->second->size();
         //Create singleton->diff_set
-        unsigned int first = *it->second.begin(); //First transaction id for element
-        unsigned int last = *--it->second.end(); //Last transaction id
+        unsigned int first = *it->second->begin(); //First transaction id for element
+        unsigned int last = *--it->second->end(); //Last transaction id
         auto diff_set_it = singleton->diff_set.begin();
         //Let's say that I have for item 100 transaction ids 5,8,12
         //Number of transactions is 20
         //So diff list {1,2,...,20} - {5,8,12} is ids before 5, ids after 12 and ids: {6,7,9,10,11}
         //Add transactions ids which are before first transaction in vertical_representation element
+        //TODO: Instead off adding elements to diff_set add first and last. Later on generate diff_set
         for(unsigned int i = 1; i < first; ++i) {
             //This is faster than emplace() when you know where to add
             singleton->diff_set.emplace_hint(diff_set_it, i);
@@ -260,7 +265,7 @@ void create_first_level_diff_sets(struct tree &t,
         }
 
         //Search and add. Start from second element. First transaction is not in diff list
-        auto s_it = ++it->second.begin();
+        auto s_it = ++it->second->begin();
         for(unsigned int i = first + 1; i <= last; ++i) {
             if(i == *s_it) {
                 //Do NOT add to diff_set
@@ -284,7 +289,7 @@ void create_first_level_diff_sets(struct tree &t,
         //Debug print
 #if DEBUG_LEVEL > 0
         cout << endl << "Transactions for: " << it->first << endl;
-        for(auto s_it = it->second.begin(); s_it != it->second.end(); ++s_it) {
+        for(auto s_it = it->second->begin(); s_it != it->second->end(); ++s_it) {
             cout << *s_it << ", ";
         }
         cout << endl << "diff_set: " << endl;
@@ -342,7 +347,7 @@ void difference(const std::set<unsigned int> &diff_set1, const std::set<unsigned
     }
 }
 
-void traverse(node *pNode)
+void traverse(node *pNode, struct tree &t)
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
 #if DEBUG_LEVEL > 1
@@ -387,7 +392,7 @@ void traverse(node *pNode)
                     (*search).second.second++; //Increase number of number_of_created_candidates_and_frequent_itemsets_of_length[level].second (which is frequent), first is candidate
                     new_node->element = (*b_it)->element;
                     new_node->support = sup;
-                    tree.add(new_node, *it);
+                    t.add(new_node, *it);
 #if DEBUG_LEVEL > 0
                     cout << "Added: " << new_node->element << " at level: " << new_node->level << " to "
                          << new_node->parent->element << " from level: " << new_node->parent->level << endl;
@@ -396,10 +401,28 @@ void traverse(node *pNode)
                     delete new_node;
                 }
             }
-            traverse((*it));
+            traverse((*it), t);
         }
     }
 }
+
+void print_out_file_header(const std::string &file)
+{
+    ofstream myfile;
+    if(file != "") {
+        myfile.open(file, fstream::out | fstream::trunc);
+        if(!myfile) {
+            cerr << "Cannot open file: " << file << endl;
+            myfile.close();
+        } else {
+            myfile << "length\tsup\tdiscovered_frequent_itemset" << endl;
+        }
+    }
+    if(myfile.is_open()) {
+        myfile.close();
+    }
+}
+
 
 int main(int argc, const char **argv)
 {
@@ -505,7 +528,6 @@ int main(int argc, const char **argv)
                 << "Argument stat was not provided. If you want stats to be saved to file, provide filename as argument --stat=stat.txt\n";
     }
 
-
     vertical_representation = new std::unordered_map<unsigned int, std::set<unsigned int> *>;
     auto s = get_wall_time();
     read_dataset(data_filename, use_taxonomy);
@@ -519,21 +541,52 @@ int main(int argc, const char **argv)
     s = get_wall_time();
     create_first_level_diff_sets(tree, vertical_representation);
 
-    //To save some memory
     e = get_wall_time();
     cout << "creation of diffLists for singleton itemsets: " << e - s << " sec." << endl;
     stat_data.push_back("creation of diffLists for singleton itemsets: " + to_string(e - s) + " sec.");
 
     s = get_wall_time();
+    //Traverse taxonomy
+    if(use_taxonomy) {
+        cout << "Calculate support for taxonomy" << endl;
+        hierarchy_tree->calculate_support(vertical_representation);
+//    Do not need to print tree because it will be printed
+//    hierarchy_tree.print_frequent_itemset(out_filename); //Prints singleton frequent_itemset from tree
+        hierarchy_tree->create_vertical_representation();
+        struct tree tree_for_hierarchy;
+        create_first_level_diff_sets(tree_for_hierarchy, hierarchy_tree->tree_vertical_representation);
+        traverse(tree_for_hierarchy.root, tree_for_hierarchy);
+        tree_for_hierarchy.print_frequent_itemset(out_filename);
+
+        e = get_wall_time();
+        cout
+                << "TAXONOMY creation of candidates for frequent itemsets as well as calculation of their diffLists and supports: "
+                << e - s << " sec." << endl;
+        stat_data.push_back(
+                "TAXONOMY creation of candidates for frequent itemsets as well as calculation of their diffLists and supports: " +
+                to_string(e - s) + " sec.");
+        delete hierarchy_tree;
+    }
+
+    cout << "delete vertical_rep <= min_sup" << endl;
+    //Kasowanie z vertical_rep
+    for(auto it = vertical_representation->begin(); it != vertical_representation->end();) {
+        if(it->second->size() <= min_sup)
+            it = vertical_representation->erase(it);
+        else
+            ++it;
+    }
 
     //dEclat algo
-    traverse(tree.root);
+    traverse(tree.root, tree);
 
-    //Traverse taxonomy
-    hierarchy_tree.calculate_support();
-    hierarchy_tree.print_frequent_itemset(out_filename);
+    print_out_file_header(out_filename);
+
 
     //I can delete hierarchy_tree here too
+    for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
+        delete it->second;
+    }
     delete vertical_representation;
 
     e = get_wall_time();
