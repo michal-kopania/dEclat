@@ -125,8 +125,8 @@ int read_dataset(const string &filename, bool use_taxonomy)
 #if DEBUG_LEVEL > 1
                     std::cout << endl<<"Found " << search->first << ", parent: " << search->second << '\n';
 #endif
-                    (*vertical_representation)[search->second].insert(
-                            t_id); //Comment this if you want append parents to transaction
+                    //Comment this if you want append all parents to transaction
+                    (*vertical_representation)[search->second].insert(t_id);
 #if DEBUG_LEVEL > 0
                     parent_elements.emplace(search->second);
 #endif
