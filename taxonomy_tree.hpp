@@ -11,11 +11,13 @@
 #include <unordered_map>
 #include <set>
 #include <map>
+#include "tree.hpp"
 
 extern std::unordered_map<unsigned int, std::set<unsigned int>> *vertical_representation;
 extern unsigned int number_of_frequent_itemsets;
 extern unsigned int number_of_created_candidates;
 extern std::map<unsigned int, std::pair<unsigned int, unsigned int>> number_of_created_candidates_and_frequent_itemsets_of_length; //For stats
+extern struct tree tree;
 
 struct taxonomy_node
 {
@@ -37,6 +39,12 @@ struct taxonomy_node
      * @param with_set
      */
     void merge_transaction_ids(const std::set<unsigned int> &with_set);
+
+    /**
+     * @brief Calculates diff_set from children[].diff_set
+     * @note diff_set for children MUST be already calculated
+    */
+    void calculate_diff_set_from_children();
 
     /**
      * @brief Just prints out node

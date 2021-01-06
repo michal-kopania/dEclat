@@ -7,7 +7,7 @@
 #include "tree.hpp"
 #include "taxonomy_tree.hpp"
 
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 1
 
 namespace fs = std::filesystem;
 using namespace std;
@@ -19,13 +19,59 @@ std::unordered_map<unsigned int, unsigned int> taxonomy; // Read from taxonomy f
 taxonomy_tree hierarchy_tree;
 /*For each item I look for its parent in taxonomy. I have noticed, that hierarchy at the botton level has many leafs, but at the level up number of leaves is very small. That’s why I have second set - parent_taxonomy. When I look for parent of item in dataset I search taxonomy, but to search for its parent I search in parent_taxonomy structure. It is faster that way.*/
 std::unordered_map<unsigned int, std::set<unsigned int>> *vertical_representation;
-tree tree;
+struct tree tree;
 unsigned int number_of_transactions = 0;
 vector<string> stat_data; //Info to be saved in stat file.
 unsigned int number_of_created_candidates = 0; //total # of created candidates,
 unsigned int number_of_frequent_itemsets = 0;// total # of discovered frequent itemsets
 std::map<unsigned int, pair<unsigned int, unsigned int>> number_of_created_candidates_and_frequent_itemsets_of_length; //For stats
 //- # of created candidates of length 1, total # of discovered frequent itemsets of length 1
+
+void test_intersect(const vector<set<unsigned int>> &children, set<unsigned int> &intersect_set)
+{
+//pNode diff_set is common part of all children
+    int a;
+    a = 1;
+    auto size = children.size();
+    if(size == 0) return;
+    std::set<unsigned int>::iterator iter[size];
+    int i = 0;
+    for(auto it = children.begin(); it != children.end(); ++it) {
+        iter[i] = (*it).begin();
+        ++i;
+    }
+    auto it0 = iter[0];
+    auto c_s = children[0].size();
+    int equal[c_s];
+    for(i = 0; i < c_s; ++i) {
+        equal[i] = 1;
+    }
+    int el_idx = 0;
+    while(it0 != children[0].end()) {
+        for(int i = 1; i < size; ++i) {
+            if(iter[i] == children[i].end()) {
+                continue;
+            }
+            if(*it0 == *iter[i]) {
+                equal[el_idx]++;
+                ++iter[i];
+            } else if(*it0 < *iter[i]) {
+                ++it0; //Go to next element
+                ++el_idx;
+            } else {
+                ++iter[i];
+            }
+            if(equal[el_idx] == size) {
+                //Add to common set
+                intersect_set.emplace(*it0);
+                ++it0;
+                ++el_idx;
+                break;
+            }
+        }
+
+    }
+}
 
 double get_wall_time()
 {
@@ -120,39 +166,12 @@ int read_dataset(const string &filename, bool use_taxonomy)
 #endif
             auto inserted = (*vertical_representation)[element].insert(t_id);
             if(use_taxonomy) {
+#if DEBUG_LEVEL > 0
                 auto search = taxonomy.find(element);
                 if(search != taxonomy.end()) {
-#if DEBUG_LEVEL > 1
-                    std::cout << endl<<"Found " << search->first << ", parent: " << search->second << '\n';
-#endif
-                    //Comment this if you want append all parents to transaction
-                    (*vertical_representation)[search->second].insert(t_id);
-#if DEBUG_LEVEL > 0
                     parent_elements.emplace(search->second);
-#endif
-                    /* I do not insert parents from hierarchy. I will later on display them
-                     * Id abcdE is frequent than abcdEParent_E is also frequent
-                     * Parent_E is also frequent Need to think it over*/
-                    //Uncomment if you want put parents to transaction
-                    /*
-                    while(true) {
-                        search = taxonomy.find(search->second);
-                        if(search != taxonomy.end()) {
-#if DEBUG_LEVEL > 1
-                            std::cout << " -> " << search->first ;// << " " << search->second << '\n';
-#endif
-                            parent_elements.emplace(search->first);
-                            (*vertical_representation)[search->first].insert(t_id);
-                        } else {
-                            break;
-                        }
-                    }
-                    */
-                } else {
-#if DEBUG_LEVEL > 1
-                    std::cout << "Not found\n";
-#endif
                 }
+#endif
             }
 #if DEBUG_LEVEL > 0
             cout << ", ";
@@ -268,7 +287,6 @@ void create_first_level_diff_sets()
 
 }
 
-//Nie potrzebne
 void
 common(const std::set<unsigned int> &diff_set1, const std::set<unsigned int> &diff_set2, std::set<unsigned int> &result)
 {
@@ -370,6 +388,7 @@ void traverse(node *pNode)
 
 int main(int argc, const char **argv)
 {
+
     auto start_time = get_wall_time();
     // Declare the supported options.
     po::options_description desc("Allowed options");
@@ -484,21 +503,23 @@ int main(int argc, const char **argv)
     //First level
     s = get_wall_time();
     create_first_level_diff_sets();
-    hierarchy_tree.calculate_support();
 
     //To save some memory
-    delete vertical_representation;
     e = get_wall_time();
     cout << "creation of diffLists for singleton itemsets: " << e - s << " sec." << endl;
     stat_data.push_back("creation of diffLists for singleton itemsets: " + to_string(e - s) + " sec.");
 
     s = get_wall_time();
-    //Traverse taxonomy
-    hierarchy_tree.print_frequent_itemset(out_filename);
-    //I can delete hierarchy_tree here.
 
     //dEclat algo
     traverse(tree.root);
+
+    //Traverse taxonomy
+    hierarchy_tree.calculate_support();
+    hierarchy_tree.print_frequent_itemset(out_filename);
+
+    //I can delete hierarchy_tree here too
+    delete vertical_representation;
 
     e = get_wall_time();
     cout << "creation of candidates for frequent itemsets as well as calculation of their diffLists and supports: "
@@ -545,3 +566,71 @@ int main(int argc, const char **argv)
     cout << "saving results to OUT and STAT files: " << e - s << " sec." << endl;
     return 0;
 }
+
+
+/*
+    {
+        vector<set<unsigned int>> vector1;
+        set<unsigned int> intersect_set;
+        set<unsigned int> set1 = {3, 6};
+        vector1.push_back(set1);
+        set1 = {1, 2, 3, 4, 5, 6};
+        vector1.push_back(set1);
+        set1 = {2, 6};
+        vector1.push_back(set1);
+        test_intersect(vector1, intersect_set);
+        cout<<intersect_set.size()<<" {";
+        for(auto it=intersect_set.begin();it!=intersect_set.end();++it){
+            cout<<*it<<", ";
+        }
+        cout<<"}"<<endl;
+    }
+    {
+        vector<set<unsigned int>> children;
+        set<unsigned int> intersect_set;
+        set<unsigned int> set1 = {3, 6};
+        children.push_back(set1);
+        set1 = {1, 2, 3, 4, 5};
+        children.push_back(set1);
+        set1 = {2, 7};
+        children.push_back(set1);
+        test_intersect(children, intersect_set);
+        cout<<intersect_set.size()<<" {";
+        for(auto it=intersect_set.begin();it!=intersect_set.end();++it){
+            cout<<*it<<", ";
+        }
+        cout<<"}"<<endl;
+    }
+    {
+        vector<set<unsigned int>> children;
+        set<unsigned int> intersect_set;
+        set<unsigned int> set1 = {3, 6};
+        children.push_back(set1);
+        set1 = {1, 2, 3, 4, 5, 6};
+        children.push_back(set1);
+        set1 = {2, 3, 6};
+        children.push_back(set1);
+        test_intersect(children, intersect_set);
+        cout<<intersect_set.size()<<" {";
+        for(auto it=intersect_set.begin();it!=intersect_set.end();++it){
+            cout<<*it<<", ";
+        }
+        cout<<"}"<<endl;
+    }
+    {
+        vector<set<unsigned int>> children;
+        set<unsigned int> intersect_set;
+        set<unsigned int> set1 ={1, 3, 4, 6};
+        children.push_back(set1);
+        set1 = {1, 2, 3, 4, 5, 6};
+        children.push_back(set1);
+        set1 = {1, 2, 3, 6};
+        children.push_back(set1);
+        test_intersect(children, intersect_set);
+        cout<<intersect_set.size()<<" {";
+        for(auto it=intersect_set.begin();it!=intersect_set.end();++it){
+            cout<<*it<<", ";
+        }
+        cout<<"}"<<endl;
+    }
+*/

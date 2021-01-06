@@ -15,11 +15,22 @@
 struct node
 {
     node *parent = nullptr; //Pointer to parent
-    std::vector<node *> children; //List of children
+
+    /*
+     * @brief List of children.
+     * Children of root are singleton items from vertical_representation
+     * Down the tree children are added as described https://arxiv.org/pdf/1901.07773v1.pdf
+     */
+    std::vector<node *> children;
+
     unsigned int element = 0; //Item id
+
     unsigned int support = 0; //Support number
+
     std::set<unsigned int> diff_set; //set of diff transactions ids
+
     unsigned int level = 0; //On which level of a tree node is
+
     //std::string name;
 
     void print();
