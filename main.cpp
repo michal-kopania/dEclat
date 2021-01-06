@@ -7,7 +7,7 @@
 #include "tree.hpp"
 #include "taxonomy_tree.hpp"
 
-#define DEBUG_LEVEL 1
+#define DEBUG_LEVEL 0
 
 namespace fs = std::filesystem;
 using namespace std;
@@ -125,16 +125,18 @@ int read_dataset(const string &filename, bool use_taxonomy)
 #if DEBUG_LEVEL > 1
                     std::cout << endl<<"Found " << search->first << ", parent: " << search->second << '\n';
 #endif
-                    (*vertical_representation)[search->second].insert(t_id);
+                    (*vertical_representation)[search->second].insert(
+                            t_id); //Comment this if you want append parents to transaction
 #if DEBUG_LEVEL > 0
                     parent_elements.emplace(search->second);
 #endif
                     /* I do not insert parents from hierarchy. I will later on display them
                      * Id abcdE is frequent than abcdEParent_E is also frequent
                      * Parent_E is also frequent Need to think it over*/
+                    //Uncomment if you want put parents to transaction
                     /*
                     while(true) {
-                        search = parent_taxonomy.find(search->second);
+                        search = taxonomy.find(search->second);
                         if(search != taxonomy.end()) {
 #if DEBUG_LEVEL > 1
                             std::cout << " -> " << search->first ;// << " " << search->second << '\n';
@@ -218,7 +220,9 @@ void create_first_level_diff_sets()
         unsigned int first = *it->second.begin(); //First transaction id for element
         unsigned int last = *--it->second.end(); //Last transaction id
         auto diff_set_it = singleton->diff_set.begin();
-
+        //Let's say that I have for item 100 transaction ids 5,8,12
+        //Number of transactions is 20
+        //So diff list {1,2,...,20} - {5,8,12} is ids before 5, ids after 12 and ids: {6,7,9,10,11}
         //Add transactions ids which are before first transaction in vertical_representation element
         for(unsigned int i = 1; i < first; ++i) {
             //This is faster than emplace() when you know where to add
@@ -231,13 +235,14 @@ void create_first_level_diff_sets()
         for(unsigned int i = first + 1; i <= last; ++i) {
             if(i == *s_it) {
                 //Do NOT add to diff_set
-                ++s_it;
+                ++s_it; //Go to next element
             } else if(i < *s_it) {
                 //Add i to diff_set
                 singleton->diff_set.emplace_hint(diff_set_it, i);
                 diff_set_it = singleton->diff_set.end();
             }
         }
+
         //Add ids which are after last element
         for(unsigned int i = last + 1; i <= number_of_transactions; ++i) {
             //This is faster than emplace()
@@ -284,7 +289,7 @@ common(const std::set<unsigned int> &diff_set1, const std::set<unsigned int> &di
     }
 }
 
-//Można poprawić uwzględniając min_sup
+//Można poprawić uwzględniając min_sup. Mniej porównań będzie wtedy
 void difference(const std::set<unsigned int> &diff_set1, const std::set<unsigned int> &diff_set2,
                 std::set<unsigned int> &result)
 {
@@ -316,7 +321,7 @@ void traverse(node *pNode)
         (*it)->print();
 #endif
         auto brother = it;
-        brother++; //For all righ hand brothers
+        brother++; //For all right hand brothers
         for(auto b_it = brother; b_it != pNode->children.end(); ++b_it) {
             //Go deeper and create and calculate next level
             //For statistics
@@ -343,7 +348,7 @@ void traverse(node *pNode)
             //I have diff list, so
             difference((*b_it)->diff_set, (*it)->diff_set, new_node->diff_set);
             //if sup > minSup add to tree
-            //Calculate sup
+            //Calculate sup sup(a) - len(D(ab))
             auto sup = (*it)->support - new_node->diff_set.size();
             if(sup > min_sup) {
                 ++number_of_frequent_itemsets;
@@ -431,7 +436,7 @@ int main(int argc, const char **argv)
         if(out_filename == "") {
             if(use_taxonomy) {
                 out_filename = string("out_Hierarchy-dEclat_") + fs::path(data_filename.c_str()).stem().native() +
-                               string("_m") + to_string(min_sup) + "h" +
+                               string("_m") + to_string(min_sup) + "_h" +
                                fs::path(taxonomy_filename.c_str()).stem().native() + ".txt";
             } else {
                 //out_Hierarchy-dEclat_fname_m400_hName.txt
@@ -451,7 +456,7 @@ int main(int argc, const char **argv)
         if(stat_filename == "") {
             if(use_taxonomy) {
                 stat_filename = string("stat_Hierarchy-dEclat_") + fs::path(data_filename.c_str()).stem().native() +
-                                string("_m") + to_string(min_sup) + "h" +
+                                string("_m") + to_string(min_sup) + "_h" +
                                 fs::path(taxonomy_filename.c_str()).stem().native() + ".txt";
             } else {
                 //out_Hierarchy-dEclat_fname_m400_hName.txt

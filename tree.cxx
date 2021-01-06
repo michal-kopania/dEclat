@@ -48,7 +48,7 @@ void tree::print_frequent_itemset(const std::string &file)
                  << endl;
             myfile.close();
         } else {
-            //myfile << "length, sup, discovered_frequent_itemset" << endl;
+            //myfile << "length\tsup\tdiscovered_frequent_itemset" << endl;
         }
     }
 
@@ -71,9 +71,9 @@ void tree::print_frequent_itemset(node *pNode, std::string all_ascendats, ofstre
         }
         parent += to_string((*it)->element);
         if(file.is_open()) {
-            file << (*it)->level << ", " << (*it)->support << ", {" << parent << "}" << endl;
+            file << (*it)->level << "\t" << (*it)->support << "\t" << parent << "" << endl;
         } else {
-            cout << (*it)->level << ", " << (*it)->support << ", {" << parent << "}" << endl;
+            cout << (*it)->level << "\t" << (*it)->support << "\t" << parent << "" << endl;
         }
         this->print_frequent_itemset((*it), parent, file);
     }

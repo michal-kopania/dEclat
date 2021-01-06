@@ -18,7 +18,7 @@ struct node
     std::vector<node *> children; //List of children
     unsigned int element = 0; //Item id
     unsigned int support = 0; //Support number
-    std::set<unsigned int> diff_set; //set of transactions ids
+    std::set<unsigned int> diff_set; //set of diff transactions ids
     unsigned int level = 0; //On which level of a tree node is
     //std::string name;
 

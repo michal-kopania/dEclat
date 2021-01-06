@@ -23,7 +23,13 @@ struct taxonomy_node
     std::vector<taxonomy_node *> children; //List of children
     unsigned int element = 0; //Item id
     unsigned int support = 0; //Support number
-    std::set<unsigned int> transaction_ids; //List of transaction ids for this node from vertical_representation
+    //Just for checking if everything is OK. To remove later on
+    std::set<unsigned int> transaction_ids; //List of transaction ids for this node from vertical_representation. For parent it is sum of children's transaction_ids
+    /**
+     * @brief For leafs it is copied from tree diff_set is calculated in function create_first_level_diff_sets()
+     * If parent has one child it is copied from child if for parent has more than one child it is common part of children diff_sets
+     */
+    std::set<unsigned int> diff_set; //set of difflist transactions ids
     //std::string name;
 
     /**

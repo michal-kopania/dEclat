@@ -169,8 +169,12 @@ void taxonomy_node::print()
 
 void taxonomy_node::merge_transaction_ids(const std::set<unsigned int> &with_set)
 {
-    for(auto it = with_set.begin(); it != with_set.end(); ++it) {
-        this->transaction_ids.insert((*it));
+    if(this->transaction_ids.empty()) {
+        this->transaction_ids = with_set;
+    } else {
+        for(auto it = with_set.begin(); it != with_set.end(); ++it) {
+            this->transaction_ids.insert((*it));
+        }
     }
 }
 
@@ -185,7 +189,7 @@ void taxonomy_tree::print_frequent_itemset(const std::string &file)
                  << endl;
             myfile.close();
         } else {
-            myfile << "length, sup, discovered_frequent_itemset" << endl;
+            myfile << "length\tsup\tdiscovered_frequent_itemset" << endl;
         }
     }
     for(auto it = roots.begin(); it != roots.end(); ++it) {
@@ -227,9 +231,9 @@ taxonomy_tree::print_frequent_itemset(taxonomy_node *pNode, std::string all_asce
     parent += to_string(pNode->element);
 
     if(file.is_open()) {
-        file << level << ", " << pNode->support << ", {" << parent << "}" << endl;
+        file << level << "\t" << pNode->support << "\t" << parent << "" << endl;
     } else {
-        cout << level << ", " << pNode->support << ", {" << parent << "}" << endl;
+        cout << level << "\t" << pNode->support << "\t" << parent << "" << endl;
     }
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         this->print_frequent_itemset((*it), parent, file, level);
