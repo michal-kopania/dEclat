@@ -84,6 +84,7 @@ void taxonomy_tree::print(taxonomy_node *pNode)
 void taxonomy_tree::set_sup_from_vertical_representation(
         std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation)
 {
+    cout << "set_sup_from_vertical_representation()" << endl;
     for(auto it = roots.begin(); it != roots.end(); ++it) {
         set_sup_from_vertical_representation((*it).second, vertical_representation);
     }
@@ -104,12 +105,16 @@ void taxonomy_tree::set_sup_from_vertical_representation(taxonomy_node *pNode,
             pNode->support = search->second->size();
             pNode->transaction_ids = *search->second; //copy. Its safer that way. Can be optimized
             //Copy from first level of tree
+            //TODO: Either use diff_set or transaction_ids
+            //I do not use diff_set
+            /*
             for(auto it = tree.root->children.begin(); it != tree.root->children.end(); ++it) {
                 if((*it)->element == pNode->element) {
                     pNode->diff_set = (*it)->diff_set; //copy.  Its safer. Can be optimized
                     break;
                 }
             }
+            */
 
         }
         //pNode->print();
@@ -118,6 +123,7 @@ void taxonomy_tree::set_sup_from_vertical_representation(taxonomy_node *pNode,
 
 void taxonomy_tree::set_sup_from_children()
 {
+    cout << "set_sup_from_children()" << endl;
     for(auto it = roots.begin(); it != roots.end(); ++it) {
         set_sup_from_children((*it).second);
     }
