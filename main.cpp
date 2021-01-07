@@ -579,17 +579,19 @@ int main(int argc, const char **argv)
         struct tree tree_for_hierarchy;
         create_first_level_diff_sets(tree_for_hierarchy, hierarchy_tree->tree_vertical_representation);
         cout << "traverse for taxonomy" << endl;
+        hierarchy_tree->clear_sets_in_nodes();
+        //TODO: hierarchy_tree may be used to speed up the process.
+        //I do not have to calculate list: A, B (parent of A), C (parent of B) if list: A was already calculated.
         traverse(tree_for_hierarchy.root, tree_for_hierarchy, hierarchy_tree);
         tree_for_hierarchy.print_frequent_itemset(out_filename);
-
+        delete hierarchy_tree; //Free memory
         e = get_wall_time();
         cout
-                << "TAXONOMY creation of candidates for frequent itemsets as well as calculation of their diffLists and supports: "
+                << "Taxonomy creation of candidates for frequent itemsets as well as calculation of their diffLists and supports: "
                 << e - s << " sec." << endl;
         stat_data.push_back(
-                "TAXONOMY creation of candidates for frequent itemsets as well as calculation of their diffLists and supports: " +
+                "Taxonomy creation of candidates for frequent itemsets as well as calculation of their diffLists and supports: " +
                 to_string(e - s) + " sec.");
-        delete hierarchy_tree;
     }
 
     s = get_wall_time();

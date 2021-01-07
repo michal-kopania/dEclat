@@ -50,6 +50,12 @@ struct taxonomy_node
      */
     void print();
 
+    void clear_sets()
+    {
+        transaction_ids.clear();
+        diff_set.clear();
+    }
+
     /**
      * @brief Constructor
      * @note Does NOT add created element to parent.children
@@ -124,6 +130,8 @@ struct taxonomy_tree
      */
     void print_frequent_itemset(const std::string &file);
 
+    void clear_sets_in_nodes();
+
     ~taxonomy_tree()
     {
         for(auto it = roots.begin(); it != roots.end(); ++it) {
@@ -159,6 +167,9 @@ private:
     void print_frequent_itemset(taxonomy_node *pNode, std::string all_ascendats, std::ofstream &file, int level);
 
     void print(taxonomy_node *pNode);
+
+    void clear_sets_in_nodes(taxonomy_node *pNode);
+
 };
 
 

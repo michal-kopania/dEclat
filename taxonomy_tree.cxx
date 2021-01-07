@@ -408,3 +408,20 @@ taxonomy_tree::calculate_support(std::unordered_map<unsigned int, std::set<unsig
 #endif
 }
 
+void taxonomy_tree::clear_sets_in_nodes()
+{
+    for(auto it = roots.begin(); it != roots.end(); ++it) {
+        clear_sets_in_nodes((*it).second);
+    }
+}
+
+void taxonomy_tree::clear_sets_in_nodes(taxonomy_node *pNode)
+{
+    pNode->clear_sets();
+    for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
+        if((*it) != nullptr) {
+            this->clear_sets_in_nodes((*it));
+        }
+    }
+}
+
