@@ -54,10 +54,10 @@ struct tree
 
     void add(node *current_node, node *parent_node);
 
-    void print();
+    void print(bool sorted);
 
     //format: length, sup, discovered_frequent_itemset
-    void print_frequent_itemset(const std::string &file);
+    void print_frequent_itemset(const std::string &file, bool sorted);
 
     ~tree()
     {
@@ -67,7 +67,10 @@ struct tree
 private:
     void print(node *pNode);
 
-    void print_frequent_itemset(node *pNode, std::string all_ascendats, std::ofstream &file);
+    void print_frequent_itemset(node *pNode, std::string all_ascendants, std::ofstream &file);
+
+    void print_frequent_itemset_sorted(node *pNode, std::set<unsigned int> all_ascendants, std::ofstream &file);
+
 };
 
 

@@ -474,6 +474,7 @@ int main(int argc, const char **argv)
             ("taxonomy,t", po::value<std::string>(), "taxonomy filename")
             ("out,o", po::value<std::string>(&out_filename)->default_value(""), "out filename")
             ("stat,s", po::value<std::string>(&stat_filename)->default_value(""), "stat filename")
+            ("sorted,r", po::value<bool>(), "if set to 1 then sort discovered frequent items in output")
             ("taxonomy_handling,th", po::value<std::string>(&taxonomy_handling)->default_value("in_tids"),
              "taxonomy handling. Values: in_tids - all ascendants are added to transactions\n separate - Taxonomy is treated separately. Frequent item sets are generated from transactions and taxonomy separately\nDefault value: in_tids");
 
@@ -506,12 +507,36 @@ int main(int argc, const char **argv)
         return 1;
     }
 
+    bool items_sorted = false;
+    std::string s_sorted = "";
+    if(vm.count("sorted")) {
+        items_sorted = vm["sorted"].as<bool>();
+        cout << "sorted was set to: "
+             << items_sorted << "\n";
+        stat_data.push_back("sorted was set to: " + to_string(items_sorted));
+        s_sorted = "_sorted";
+    }
+
     bool use_taxonomy;
     if(vm.count("taxonomy")) {
         taxonomy_filename = vm["taxonomy"].as<string>();
         cout << "taxonomy was set to: "
              << taxonomy_filename << "\n";
         stat_data.push_back("name of the hierarchy dataset: " + taxonomy_filename);
+        use_taxonomy = true;
+    } else {
+        use_taxonomy = false;
+        cout
+                << "Argument taxonomy was not provided. Calculation will be performed without hierarchy. To calculate dEclat with hierarchy, provide taxonomy filename --taxonomy=taxonomy_data.txt\n";
+    }
+
+    if(use_taxonomy) {
+        if(vm.count("taxonomy_handling")) {
+            taxonomy_handling = vm["taxonomy_handling"].as<string>();
+            cout << "taxonomy_handling was set to: "
+                 << taxonomy_handling << "\n";
+            stat_data.push_back("taxonomy_handling: " + taxonomy_handling);
+        }
         auto s = get_wall_time();
         //cout<<"reading the hierarchy datasets start: "<<s<<endl;
         if(read_taxonomy(taxonomy_filename) < 0) {
@@ -519,21 +544,8 @@ int main(int argc, const char **argv)
         }
         auto e = get_wall_time();
         cout << "reading the hierarchy datasets: " << e - s << " sec." << endl;
-        use_taxonomy = true;
         stat_data.push_back("reading the hierarchy datasets: " + to_string(e - s) + " sec.");
-    } else {
-        use_taxonomy = false;
-        cout
-                << "Argument taxonomy was not provided. Calculation will be performed without hierarchy. To calculate dEclat with hierarchy, provide taxonomy filename --taxonomy=taxonomy_data.txt\n";
     }
-
-    if(vm.count("taxonomy_handling")) {
-        taxonomy_handling = vm["taxonomy_handling"].as<string>();
-        cout << "taxonomy_handling was set to: "
-             << taxonomy_handling << "\n";
-        stat_data.push_back("taxonomy_handling: " + taxonomy_handling);
-    }
-
 
     if(vm.count("out")) {
         out_filename = vm["out"].as<string>();
@@ -545,11 +557,11 @@ int main(int argc, const char **argv)
                 if(taxonomy_handling == "separate") {
                     out_filename += "_sep";
                 }
-                out_filename += ".txt";
+                out_filename += s_sorted + ".txt";
             } else {
                 //out_Hierarchy-dEclat_fname_m400_hName.txt
                 out_filename = string("out_Hierarchy-dEclat_") + fs::path(data_filename.c_str()).stem().native() +
-                               string("_m") + to_string(min_sup) + ".txt";
+                               string("_m") + to_string(min_sup) + s_sorted + ".txt";
             }
         }
         cout << "out was set to: "
@@ -569,11 +581,11 @@ int main(int argc, const char **argv)
                 if(taxonomy_handling == "separate") {
                     stat_filename += "_sep";
                 }
-                stat_filename += ".txt";
+                stat_filename += s_sorted + ".txt";
             } else {
                 //out_Hierarchy-dEclat_fname_m400_hName.txt
                 stat_filename = string("stat_Hierarchy-dEclat_") + fs::path(data_filename.c_str()).stem().native() +
-                                string("_m") + to_string(min_sup) + ".txt";
+                                string("_m") + to_string(min_sup) + s_sorted + ".txt";
             }
         }
         cout << "stat was set to: "
@@ -624,7 +636,7 @@ int main(int argc, const char **argv)
             //TODO: hierarchy_tree may be used to speed up the process.
             //I do not have to calculate list: A, B (parent of A), C (parent of B) if list: A was already calculated.
             traverse(tree_for_hierarchy.root, tree_for_hierarchy, hierarchy_tree);
-            tree_for_hierarchy.print_frequent_itemset(out_filename);
+            tree_for_hierarchy.print_frequent_itemset(out_filename, items_sorted);
             auto l = (*it).first - 1;
             number_of_items_of_greatest_cardinality_for_level[l] = tree_for_hierarchy.number_of_items_of_greatest_cardinality;
             greatest_cardinality[l] = tree_for_hierarchy.max_level;
@@ -670,7 +682,7 @@ int main(int argc, const char **argv)
 #endif
 
     s = get_wall_time();
-    tree.print_frequent_itemset(out_filename);
+    tree.print_frequent_itemset(out_filename, items_sorted);
     ofstream myfile;
     if(stat_filename != "") {
         myfile.open(stat_filename, fstream::out | fstream::trunc);

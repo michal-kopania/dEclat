@@ -31,13 +31,13 @@ void tree::print(node *pNode)
 }
 
 
-void tree::print()
+void tree::print(bool sorted)
 {
     //visited.clear();
-    print(root);
+    this->print(root);
 }
 
-void tree::print_frequent_itemset(const std::string &file)
+void tree::print_frequent_itemset(const std::string &file, bool sorted)
 {
     string ascendant = "";
     ofstream myfile;
@@ -51,21 +51,25 @@ void tree::print_frequent_itemset(const std::string &file)
             //myfile << "length\tsup\tdiscovered_frequent_itemset" << endl;
         }
     }
-
-    this->print_frequent_itemset(this->root, ascendant, myfile);
+    if(sorted) {
+        std::set<unsigned int> set_ascendant;
+        this->print_frequent_itemset_sorted(this->root, set_ascendant, myfile);
+    } else {
+        this->print_frequent_itemset(this->root, ascendant, myfile);
+    }
     if(myfile.is_open()) {
         myfile.close();
     }
 }
 
-void tree::print_frequent_itemset(node *pNode, std::string all_ascendats, ofstream &file)
+void tree::print_frequent_itemset(node *pNode, std::string all_ascendants, ofstream &file)
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         if((*it)->level == this->max_level) {
             ++number_of_items_of_greatest_cardinality;
         }
         ////format: length, sup, discovered_frequent_itemset
-        string parent = all_ascendats;
+        string parent = all_ascendants;
         if((*it)->level > 1) {
             parent += ", ";
         }
@@ -76,6 +80,30 @@ void tree::print_frequent_itemset(node *pNode, std::string all_ascendats, ofstre
             cout << (*it)->level << "\t" << (*it)->support << "\t" << parent << "" << endl;
         }
         this->print_frequent_itemset((*it), parent, file);
+    }
+}
+
+void tree::print_frequent_itemset_sorted(node *pNode, std::set<unsigned int> all_ascendants, ofstream &file)
+{
+    for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
+        if((*it)->level == this->max_level) {
+            ++number_of_items_of_greatest_cardinality;
+        }
+        ////format: length, sup, discovered_frequent_itemset
+        all_ascendants.insert((*it)->element);
+        string parent = "";
+        for(auto it = all_ascendants.begin(); it != all_ascendants.end(); ++it) {
+            if(parent != "") {
+                parent += ", ";
+            }
+            parent += to_string((*it));
+        }
+        if(file.is_open()) {
+            file << (*it)->level << "\t" << (*it)->support << "\t" << parent << endl;
+        } else {
+            cout << (*it)->level << "\t" << (*it)->support << "\t" << parent << endl;
+        }
+        this->print_frequent_itemset_sorted((*it), all_ascendants, file);
     }
 }
 
