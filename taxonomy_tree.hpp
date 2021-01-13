@@ -17,6 +17,7 @@ extern unsigned int number_of_frequent_itemsets;
 extern unsigned int number_of_created_candidates;
 extern std::map<unsigned int, std::pair<unsigned int, unsigned int>> number_of_created_candidates_and_frequent_itemsets_of_length; //For stats
 extern struct tree tree;
+extern std::string taxonomy_handling;
 
 struct taxonomy_node
 {
@@ -111,7 +112,7 @@ struct taxonomy_tree
      */
     taxonomy_node *find(unsigned int element);
 
-    taxonomy_node *find(taxonomy_node *pNode, unsigned int element, bool &found);
+    void find(taxonomy_node *pNode, unsigned int element, bool &found, taxonomy_node *&found_node);
 
     /**
      * @brief prints tree elements
@@ -131,6 +132,10 @@ struct taxonomy_tree
     void print_frequent_itemset(const std::string &file);
 
     void clear_sets_in_nodes();
+
+    void remove_infrequent_from_vertical_representation();
+
+    void remove_parents_from_vertical_representation();
 
     ~taxonomy_tree()
     {
@@ -155,7 +160,7 @@ private:
     void set_sup_from_vertical_representation(taxonomy_node *pNode,
                                               std::unordered_map<unsigned int, std::set<unsigned int> *> *vertical_representation);
 
-    void create_vertical_representation(taxonomy_node *pNode);
+    void create_vertical_representation(taxonomy_node *pNode, unsigned int level);
     /**
      * @brief sets support and transaction_ids property for tree nodes based on transaction_ids and support property from node's children.
      * transaction_ids are merged transaction_ids from children

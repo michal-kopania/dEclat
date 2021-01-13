@@ -162,36 +162,52 @@ void taxonomy_tree::create_vertical_representation()
     }
     tree_vertical_representation = new std::unordered_map<unsigned int, std::set<unsigned int> *>;
     for(auto it = roots.begin(); it != roots.end(); ++it) {
-        create_vertical_representation((*it).second);
+        create_vertical_representation((*it).second, 0);
     }
 }
 
-void taxonomy_tree::create_vertical_representation(taxonomy_node *pNode)
+void taxonomy_tree::create_vertical_representation(taxonomy_node *pNode, unsigned int level)
 {
+    ++level;
     if(!pNode->children.empty()) {
 //        pNode->print();
-        tree_vertical_representation->insert_or_assign(pNode->element,
-                                                       &pNode->transaction_ids);//pointer to transaction_ids
-        for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
-            this->create_vertical_representation((*it));
+//For STATS
+        ++number_of_created_candidates;
+
+        auto search = number_of_created_candidates_and_frequent_itemsets_of_length.find(level);
+        std::pair<std::map<unsigned int, pair<unsigned int, unsigned int>>::iterator, bool> inserted;
+        if(search == number_of_created_candidates_and_frequent_itemsets_of_length.end()) {
+            inserted = number_of_created_candidates_and_frequent_itemsets_of_length.emplace(level,
+                                                                                            pair(1, 0));
+            search = inserted.first;
+        } else {
+            (*search).second.first++; //Increase number of candidates
+        }
+        if(pNode->support > min_sup) {
+            ++number_of_frequent_itemsets;
+            (*search).second.second++; //Increase number of frequent_itemsets
+
+            tree_vertical_representation->insert_or_assign(pNode->element,
+                                                           &pNode->transaction_ids);//pointer to transaction_ids
+            for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
+                this->create_vertical_representation((*it), level);
+            }
         }
     }
 }
 
-taxonomy_node *taxonomy_tree::find(taxonomy_node *pNode, unsigned int element, bool &found)
+void taxonomy_tree::find(taxonomy_node *pNode, unsigned int element, bool &found, taxonomy_node *&found_node)
 {
-    taxonomy_node *found_node = nullptr;
     if(!found) {
         if(pNode->element == element) {
             found = true;
             found_node = pNode;
-            return found_node;
         }
         for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
-            this->find((*it), element, found);
+            this->find((*it), element, found, found_node);
         }
     }
-    return found_node;
+
 }
 
 taxonomy_node *taxonomy_tree::find(unsigned int element)
@@ -200,7 +216,7 @@ taxonomy_node *taxonomy_tree::find(unsigned int element)
     bool found = false;
     taxonomy_node *found_node = nullptr;
     for(auto it = roots.begin(); it != roots.end(); ++it) {
-        found_node = this->find((*it).second, element, found);
+        this->find((*it).second, element, found, found_node);
         if(found) {
             break;
         }
@@ -359,21 +375,9 @@ taxonomy_tree::print_frequent_itemset(taxonomy_node *pNode, std::string all_asce
     if(pNode->children.empty()) {
         return;
     }
-    //For STATS
-    ++number_of_created_candidates;
 
-    auto search = number_of_created_candidates_and_frequent_itemsets_of_length.find(level);
-    std::pair<std::map<unsigned int, pair<unsigned int, unsigned int>>::iterator, bool> inserted;
-    if(search == number_of_created_candidates_and_frequent_itemsets_of_length.end()) {
-        inserted = number_of_created_candidates_and_frequent_itemsets_of_length.emplace(level,
-                                                                                        pair(1, 0));
-        search = inserted.first;
-    } else {
-        (*search).second.first++; //Increase number of candidates
-    }
     if(pNode->support > min_sup) {
         ++number_of_frequent_itemsets;
-        (*search).second.second++; //Increase number of frequent_itemsets
         //For STATS end
 
         if(level > 1) {
@@ -383,9 +387,9 @@ taxonomy_tree::print_frequent_itemset(taxonomy_node *pNode, std::string all_asce
         parent += to_string(pNode->element);
 
         if(file.is_open()) {
-            file << "1" << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
+            file << "1" /*level*/ << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
         } else {
-            cout << "1" << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
+            cout << "1" /*level*/ << "\t" << pNode->support << "\t" << pNode->element /*parent*/ << "" << endl;
         }
     }
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
@@ -425,3 +429,44 @@ void taxonomy_tree::clear_sets_in_nodes(taxonomy_node *pNode)
     }
 }
 
+void taxonomy_tree::remove_infrequent_from_vertical_representation()
+{
+    //Remove infrequent items from vertical representation
+    // erase all with support <= min_sup
+    for(auto it = this->tree_vertical_representation->begin(); it != this->tree_vertical_representation->end();) {
+        if(it->second->size() <= min_sup)
+            it = this->tree_vertical_representation->erase(it);
+        else
+            ++it;
+    }
+
+}
+
+void taxonomy_tree::remove_parents_from_vertical_representation()
+{
+    //Remove from tree_vertical_representation elements that have children
+    for(auto it = this->tree_vertical_representation->begin(); it != this->tree_vertical_representation->end();) {
+        auto pNode = this->find(it->first);
+        if(pNode != nullptr) {
+            if(pNode->children.empty()) {
+                it = this->tree_vertical_representation->erase(it);
+            } else {
+                //On pNodel level I have children
+                //I must check if one level below pNode I have children.
+                bool remove = false;
+                for(auto c_it = pNode->children.begin(); c_it != pNode->children.end(); ++c_it) {
+                    if(!(*c_it)->children.empty()) {
+                        remove = true;
+                        break;
+                    }
+                }
+                if(remove) {
+                    it = this->tree_vertical_representation->erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+    }
+
+}

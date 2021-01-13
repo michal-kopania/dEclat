@@ -7,7 +7,7 @@
 #include "tree.hpp"
 #include "taxonomy_tree.hpp"
 
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 1
 
 namespace fs = std::filesystem;
 using namespace std;
@@ -141,35 +141,29 @@ int read_dataset(const string &filename, bool use_taxonomy)
 #endif
                     //Comment this if you want append all parents to transaction
                     //(*vertical_representation)[search->second]->insert(t_id);
-#if DEBUG_LEVEL > 0
-                    parent_elements.emplace(search->second);
-#endif
                     /* I do not insert parents from hierarchy. I will later on display them
                      * Id abcdE is frequent than abcdEParent_E is also frequent
                      * Parent_E is also frequent Need to think it over*/
                     //Uncomment if you want put parents to transaction
 
-                    while(true) {
-                        search = taxonomy.find(search->second);
-                        if(search != taxonomy.end()) {
+                    while(search != taxonomy.end()) {
+                        auto parent = search->second;
+                        search = taxonomy.find(parent); //Search for parent
 #if DEBUG_LEVEL > 1
-                            std::cout << " -> " << search->first ;// << " " << search->second << '\n';
+                        std::cout << " -> " << search->first ;// << " " << search->second << '\n';
 #endif
 #if DEBUG_LEVEL > 0
-                            parent_elements.emplace(search->first);
+                        parent_elements.emplace(parent);
 #endif
-                            //(*vertical_representation)[search->first].insert(t_id);
-                            auto search2 = vertical_representation->find(search->first);
-                            if(search2 != vertical_representation->end()) {
-                                search2->second->insert(t_id);
-                            } else {
-                                std::set<unsigned int> *s;
-                                s = new std::set<unsigned int>;
-                                s->insert(t_id);
-                                vertical_representation->insert_or_assign(search->first, s);//
-                            }
+                        //(*vertical_representation)[search->first].insert(t_id);
+                        auto search2 = vertical_representation->find(parent);
+                        if(search2 != vertical_representation->end()) {
+                            search2->second->insert(t_id);
                         } else {
-                            break;
+                            std::set<unsigned int> *s;
+                            s = new std::set<unsigned int>;
+                            s->insert(t_id);
+                            vertical_representation->insert_or_assign(parent, s);//Add parent to vertical_representation
                         }
                     }
 
@@ -206,7 +200,7 @@ int read_dataset(const string &filename, bool use_taxonomy)
 
     std::for_each(vertical_representation->cbegin(), vertical_representation->cend(), print);
 #endif
-    //Remove infrequent items from vertical representation
+    //I can remove infrequent items from vertical representation
     // erase all with support <= min_sup
     number_of_created_candidates = vertical_representation->size();
     for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
@@ -315,7 +309,7 @@ common(const std::set<unsigned int> &diff_set1, const std::set<unsigned int> &di
     }
 }
 
-//Można poprawić uwzględniając min_sup. Mniej porównań będzie wtedy
+//TODO: Można poprawić uwzględniając min_sup. Mniej porównań będzie wtedy
 void difference(const std::set<unsigned int> &diff_set1, const std::set<unsigned int> &diff_set2,
                 std::set<unsigned int> &result)
 {
@@ -342,9 +336,24 @@ void difference(const std::set<unsigned int> &diff_set1, const std::set<unsigned
 
 void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy)
 {
+    //TODO: Wykorzystać t_taxonomy?
     //Jeśli t_taxonomy nie jest null to można sprawdzać czy right hand brother to nie jest czasem parent
     //Jeśli jest to parent to nie ma sensu liczyć ponownie
-
+    //Biorę b_it i sprawdzam czy it to nie jest parent b_it lub na odwrót (?)
+    //Jeśli b_it to parent it, to we b_it jest we tych samych lub w więcej transakcjac jak it
+    //Gdy it jest frequent to it,b_it też jest frequent
+    //diff list: D(it;b_it) = D(b_it) - D(it)
+    //D(it;b_it) = T(it) - T(b_it) = empty, bo it zawiera się w b_it
+    //support = (*it)->support - diff_set.size() = (*it)->support - 0 = (*it)->support
+    //Jeśli it to parent b_it to
+    //diff list:
+    //D(it;b_it) = T(it) - T(b_it) = trzeba policzyć
+    //Niech to będzie N elementów pochodzących z innych dzieci.
+    //support = (*b_it)->support - N
+    //(*b_it)->support jest o N większe od (*it)->support
+    //Czyli: support = (*b_it)->support - N = (*it)->support + N - N = (*it)->support
+    //Jeśli sobie ustawię tak elementy że najpierw będę miał parent to będę mógł znacznie zmniejszyć obliczenia.
+    //Tylko, że difference() zakłada posortowane elementy. Zatem root powinien w hierarchi mieć najmniejszą wartość
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
 #if DEBUG_LEVEL > 1
         (*it)->print();
@@ -364,6 +373,7 @@ void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy)
 #if DEBUG_LEVEL > 1
                 cout<<" L: "<<(*it)->level<<" item: "<<(*it)->element<<" brother:"<<(*b_it)->element<<endl;
 #endif
+                //For stats
                 auto search = number_of_created_candidates_and_frequent_itemsets_of_length.find(child_level);
                 std::pair<std::map<unsigned int, pair<unsigned int, unsigned int>>::iterator, bool> inserted;
                 if(search == number_of_created_candidates_and_frequent_itemsets_of_length.end()) {
@@ -506,10 +516,11 @@ int main(int argc, const char **argv)
             if(use_taxonomy) {
                 out_filename = string("out_Hierarchy-dEclat_") + fs::path(data_filename.c_str()).stem().native() +
                                string("_m") + to_string(min_sup) + "_h";
+                out_filename += fs::path(taxonomy_filename.c_str()).stem().native();
                 if(taxonomy_handling == "separate") {
                     out_filename += "_sep";
                 }
-                out_filename += fs::path(taxonomy_filename.c_str()).stem().native() + ".txt";
+                out_filename += ".txt";
             } else {
                 //out_Hierarchy-dEclat_fname_m400_hName.txt
                 out_filename = string("out_Hierarchy-dEclat_") + fs::path(data_filename.c_str()).stem().native() +
@@ -529,10 +540,11 @@ int main(int argc, const char **argv)
             if(use_taxonomy) {
                 stat_filename = string("stat_Hierarchy-dEclat_") + fs::path(data_filename.c_str()).stem().native() +
                                 string("_m") + to_string(min_sup) + "_h";
+                stat_filename += fs::path(taxonomy_filename.c_str()).stem().native();
                 if(taxonomy_handling == "separate") {
-                    out_filename += "_sep";
+                    stat_filename += "_sep";
                 }
-                out_filename += fs::path(taxonomy_filename.c_str()).stem().native() + ".txt";
+                stat_filename += ".txt";
             } else {
                 //out_Hierarchy-dEclat_fname_m400_hName.txt
                 stat_filename = string("stat_Hierarchy-dEclat_") + fs::path(data_filename.c_str()).stem().native() +
@@ -576,6 +588,7 @@ int main(int argc, const char **argv)
 //    hierarchy_tree.print_frequent_itemset(out_filename); //Prints singleton frequent_itemset from tree
         cout << "create_vertical_representation()" << endl;
         hierarchy_tree->create_vertical_representation();
+        hierarchy_tree->remove_parents_from_vertical_representation();
         struct tree tree_for_hierarchy;
         create_first_level_diff_sets(tree_for_hierarchy, hierarchy_tree->tree_vertical_representation);
         cout << "traverse for taxonomy" << endl;
