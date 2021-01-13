@@ -7,7 +7,7 @@
 #include "tree.hpp"
 #include "taxonomy_tree.hpp"
 
-#define DEBUG_LEVEL 1
+#define DEBUG_LEVEL 0
 
 namespace fs = std::filesystem;
 using namespace std;
@@ -202,14 +202,14 @@ int read_dataset(const string &filename, bool use_taxonomy)
 #endif
     //I can remove infrequent items from vertical representation
     // erase all with support <= min_sup
-    number_of_created_candidates = vertical_representation->size();
-    for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
-        if(it->second->size() > min_sup) {
-            ++number_of_frequent_itemsets;
-        }
-    }
-    number_of_created_candidates_and_frequent_itemsets_of_length[1] = pair(number_of_created_candidates,
-                                                                           number_of_frequent_itemsets);
+//    number_of_created_candidates = vertical_representation->size();
+//    for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
+//        if(it->second->size() > min_sup) {
+//            ++number_of_frequent_itemsets;
+//        }
+//    }
+//    number_of_created_candidates_and_frequent_itemsets_of_length[1] = pair(number_of_created_candidates,
+//                                                                           number_of_frequent_itemsets);
 
     return 1;
 }
@@ -226,9 +226,29 @@ void create_first_level_diff_sets(struct tree &t,
     t.root = root_node;
     cout << "create_first_level_diff_sets()" << endl;
     for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
-        if(it->second->size() <= min_sup) {
-            continue;
+        //For stats
+        ++number_of_created_candidates;
+        //std::cout << number_of_created_candidates << "," << number_of_frequent_itemsets << "\r" << std::flush;
+        auto search = number_of_created_candidates_and_frequent_itemsets_of_length.find(1);
+        std::pair<std::map<unsigned int, pair<unsigned int, unsigned int>>::iterator, bool> inserted;
+        if(search == number_of_created_candidates_and_frequent_itemsets_of_length.end()) {
+            inserted = number_of_created_candidates_and_frequent_itemsets_of_length.emplace(1,
+                                                                                            pair(1, 0));
+            search = inserted.first;
+        } else {
+            (*search).second.first++; //Increase number of candidates
         }
+        //stats end
+
+        //Is frequent?
+        if(it->second->size() <= min_sup) {
+            continue; //No. Go to next
+        }
+        //for stats
+        ++number_of_frequent_itemsets;
+        (*search).second.second++; //Increase number of number_of_created_candidates_and_frequent_itemsets_of_length[level].second (which is frequent), first is candidate
+        //stats end
+
         cout << it->first << "    \r";
         //it->second.size() it is support
         node *singleton;
@@ -362,10 +382,6 @@ void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy)
             auto brother = it;
             brother++; //For all right hand brothers
             for(auto b_it = brother; b_it != pNode->children.end(); ++b_it) {
-                if((*b_it)->support <= min_sup) {
-                    continue;
-                }
-                //Go deeper and create and calculate next level
                 //For statistics
                 ++number_of_created_candidates;
                 auto child_level = (*it)->level + 1;
@@ -383,6 +399,13 @@ void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy)
                 } else {
                     (*search).second.first++; //Increase number of candidates
                 }
+                //stats end
+
+                //Is it frequent?
+                if((*b_it)->support <= min_sup) {
+                    continue;
+                }
+                //Go deeper and create and calculate next level
 
                 node *new_node;
                 new_node = new node;
@@ -394,8 +417,10 @@ void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy)
                 //Calculate sup sup(a) - len(D(ab))
                 auto sup = (*it)->support - new_node->diff_set.size();
                 if(sup > min_sup) {
+                    //for stats
                     ++number_of_frequent_itemsets;
                     (*search).second.second++; //Increase number of number_of_created_candidates_and_frequent_itemsets_of_length[level].second (which is frequent), first is candidate
+                    //for stats end
                     new_node->element = (*b_it)->element;
                     new_node->support = sup;
                     t.add(new_node, *it);
@@ -506,7 +531,7 @@ int main(int argc, const char **argv)
         taxonomy_handling = vm["taxonomy_handling"].as<string>();
         cout << "taxonomy_handling was set to: "
              << taxonomy_handling << "\n";
-        //stat_data.push_back("taxonomy_handling: " + taxonomy_handling);
+        stat_data.push_back("taxonomy_handling: " + taxonomy_handling);
     }
 
 
@@ -570,14 +595,14 @@ int main(int argc, const char **argv)
     //First level
     s = get_wall_time();
     create_first_level_diff_sets(tree, vertical_representation);
-    //create_first_level_diff_sets(vertical_representation);
-
     e = get_wall_time();
     cout << "creation of diffLists for singleton itemsets: " << e - s << " sec." << endl;
     stat_data.push_back("creation of diffLists for singleton itemsets: " + to_string(e - s) + " sec.");
 
     print_out_file_header(out_filename);
 
+    unsigned int taxonomy_greatest_cardinality = 0;
+    unsigned int taxonomy_number_of_items_of_greatest_cardinality = 0;
     //Traverse taxonomy
 /* I added parents to tid_ids if taxonomy_handling == "in_tids" */
     if(use_taxonomy && taxonomy_handling == "separate") {
@@ -588,15 +613,30 @@ int main(int argc, const char **argv)
 //    hierarchy_tree.print_frequent_itemset(out_filename); //Prints singleton frequent_itemset from tree
         cout << "create_vertical_representation()" << endl;
         hierarchy_tree->create_vertical_representation();
-        hierarchy_tree->remove_parents_from_vertical_representation();
-        struct tree tree_for_hierarchy;
-        create_first_level_diff_sets(tree_for_hierarchy, hierarchy_tree->tree_vertical_representation);
-        cout << "traverse for taxonomy" << endl;
+        auto levels = (*(--hierarchy_tree->tree_vertical_representation.end())).first;
+        unsigned int number_of_items_of_greatest_cardinality_for_level[levels], greatest_cardinality[levels];
+        unsigned int max_level = 0;
+        for(auto it = hierarchy_tree->tree_vertical_representation.begin();
+            it != hierarchy_tree->tree_vertical_representation.end(); ++it) {
+            struct tree tree_for_hierarchy;
+            create_first_level_diff_sets(tree_for_hierarchy, (*it).second);
+            cout << "traverse for taxonomy for level: " << (*it).first << endl;
+            //TODO: hierarchy_tree may be used to speed up the process.
+            //I do not have to calculate list: A, B (parent of A), C (parent of B) if list: A was already calculated.
+            traverse(tree_for_hierarchy.root, tree_for_hierarchy, hierarchy_tree);
+            tree_for_hierarchy.print_frequent_itemset(out_filename);
+            auto l = (*it).first - 1;
+            number_of_items_of_greatest_cardinality_for_level[l] = tree_for_hierarchy.number_of_items_of_greatest_cardinality;
+            greatest_cardinality[l] = tree_for_hierarchy.max_level;
+        }
+        for(int i = 0; i < levels; ++i) {
+            if(greatest_cardinality[i] > taxonomy_greatest_cardinality) {
+                taxonomy_greatest_cardinality = greatest_cardinality[i];
+                taxonomy_number_of_items_of_greatest_cardinality = number_of_items_of_greatest_cardinality_for_level[i];
+            }
+        }
+
         hierarchy_tree->clear_sets_in_nodes();
-        //TODO: hierarchy_tree may be used to speed up the process.
-        //I do not have to calculate list: A, B (parent of A), C (parent of B) if list: A was already calculated.
-        traverse(tree_for_hierarchy.root, tree_for_hierarchy, hierarchy_tree);
-        tree_for_hierarchy.print_frequent_itemset(out_filename);
         delete hierarchy_tree; //Free memory
         e = get_wall_time();
         cout
@@ -648,8 +688,19 @@ int main(int argc, const char **argv)
     if(myfile.is_open()) {
         myfile << "saving results to OUT and STAT files: " << e - s << " sec." << endl;
         myfile << "total runtime: " << e - start_time << " sec." << endl;
+
+        unsigned int number_of_items_of_greatest_cardinality;
+        if(tree.max_level > taxonomy_greatest_cardinality) {
+            number_of_items_of_greatest_cardinality = tree.number_of_items_of_greatest_cardinality;
+        } else if(tree.max_level == taxonomy_greatest_cardinality) {
+            number_of_items_of_greatest_cardinality =
+                    tree.number_of_items_of_greatest_cardinality + taxonomy_number_of_items_of_greatest_cardinality;
+        } else {
+            number_of_items_of_greatest_cardinality = taxonomy_number_of_items_of_greatest_cardinality;
+        }
+
         myfile << "the number of items in a discovered frequent itemset of the greatest cardinality: "
-               << tree.number_of_items_of_greatest_cardinality << endl;
+               << number_of_items_of_greatest_cardinality << endl;
         myfile << "total # of created candidates: " << number_of_created_candidates << endl;
         myfile << "total # of discovered frequent itemsets: " << number_of_frequent_itemsets << endl;
         for(auto it = number_of_created_candidates_and_frequent_itemsets_of_length.begin();

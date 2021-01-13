@@ -157,10 +157,9 @@ void taxonomy_tree::set_sup_from_children(taxonomy_node *pNode)
 
 void taxonomy_tree::create_vertical_representation()
 {
-    if(tree_vertical_representation) {
-        delete tree_vertical_representation;
+    for(auto it = tree_vertical_representation.begin(); it != tree_vertical_representation.end(); ++it) {
+        delete (*it).second;
     }
-    tree_vertical_representation = new std::unordered_map<unsigned int, std::set<unsigned int> *>;
     for(auto it = roots.begin(); it != roots.end(); ++it) {
         create_vertical_representation((*it).second, 0);
     }
@@ -171,23 +170,13 @@ void taxonomy_tree::create_vertical_representation(taxonomy_node *pNode, unsigne
     ++level;
     if(!pNode->children.empty()) {
 //        pNode->print();
-//For STATS
-        ++number_of_created_candidates;
-
-        auto search = number_of_created_candidates_and_frequent_itemsets_of_length.find(level);
-        std::pair<std::map<unsigned int, pair<unsigned int, unsigned int>>::iterator, bool> inserted;
-        if(search == number_of_created_candidates_and_frequent_itemsets_of_length.end()) {
-            inserted = number_of_created_candidates_and_frequent_itemsets_of_length.emplace(level,
-                                                                                            pair(1, 0));
-            search = inserted.first;
-        } else {
-            (*search).second.first++; //Increase number of candidates
-        }
         if(pNode->support > min_sup) {
-            ++number_of_frequent_itemsets;
-            (*search).second.second++; //Increase number of frequent_itemsets
-
-            tree_vertical_representation->insert_or_assign(pNode->element,
+            if(items_on_level[level].empty()) {
+                //Must create
+                tree_vertical_representation[level] = new std::unordered_map<unsigned int, std::set<unsigned int> *>;
+            }
+            items_on_level[level].insert(pNode->element);
+            tree_vertical_representation[level]->insert_or_assign(pNode->element,
                                                            &pNode->transaction_ids);//pointer to transaction_ids
             for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
                 this->create_vertical_representation((*it), level);
@@ -226,7 +215,7 @@ taxonomy_node *taxonomy_tree::find(unsigned int element)
 
 void taxonomy_node::print()
 {
-    cout << this << " element: " << this->element << " parent: "
+    cout << this << " element: " << this->element /*<<" level: "<< this->level*/ << " parent: "
          << (this->parent == nullptr ? 0 : this->parent->element) << " [" << this->parent << "]" << " sup: "
          << this->support << endl << " Tids: ";
     for(auto it = this->transaction_ids.begin(); it != this->transaction_ids.end(); ++it) {
@@ -377,9 +366,6 @@ taxonomy_tree::print_frequent_itemset(taxonomy_node *pNode, std::string all_asce
     }
 
     if(pNode->support > min_sup) {
-        ++number_of_frequent_itemsets;
-        //For STATS end
-
         if(level > 1) {
             parent += "->";
         }
@@ -429,6 +415,7 @@ void taxonomy_tree::clear_sets_in_nodes(taxonomy_node *pNode)
     }
 }
 
+/*
 void taxonomy_tree::remove_infrequent_from_vertical_representation()
 {
     //Remove infrequent items from vertical representation
@@ -439,9 +426,10 @@ void taxonomy_tree::remove_infrequent_from_vertical_representation()
         else
             ++it;
     }
-
 }
+*/
 
+/*
 void taxonomy_tree::remove_parents_from_vertical_representation()
 {
     //Remove from tree_vertical_representation elements that have children
@@ -468,5 +456,5 @@ void taxonomy_tree::remove_parents_from_vertical_representation()
             }
         }
     }
-
 }
+*/

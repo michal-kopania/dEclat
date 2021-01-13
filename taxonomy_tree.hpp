@@ -34,6 +34,7 @@ struct taxonomy_node
     std::set<unsigned int> diff_set; //set of difflist transactions ids
     //std::string name;
 
+    //unsigned int level = 0; //0 - root level
     /**
      * @brief merges this->transaction_ids with given with_set
      * @param with_set
@@ -87,8 +88,11 @@ struct taxonomy_tree
     /**
      * @brief vertical representation created from taxonomy_tree All except leafs
      */
-    std::unordered_map<unsigned int, std::set<unsigned int> *> *tree_vertical_representation = nullptr;
+    std::map<unsigned int, std::unordered_map<unsigned int, std::set<unsigned int> *> *> tree_vertical_representation;
 
+    //level 1 - root. This is for debuging and allocating tree_vertical_representation[level]
+    //I could have just some indicator std::map<unsigned int, bool > tree_vertical_representation_for_level_created;
+    std::map<unsigned int, std::set<unsigned int> > items_on_level;
     /**
      * @brief constructs tree_vertical_representation property based on tree nodes except leafs
      * This will be later on will be passed to dEclat algorithm
@@ -133,18 +137,17 @@ struct taxonomy_tree
 
     void clear_sets_in_nodes();
 
-    void remove_infrequent_from_vertical_representation();
+    //void remove_infrequent_from_vertical_representation();
 
-    void remove_parents_from_vertical_representation();
+    //void remove_parents_from_vertical_representation();
 
     ~taxonomy_tree()
     {
         for(auto it = roots.begin(); it != roots.end(); ++it) {
             delete (*it).second;
         }
-
-        if(tree_vertical_representation) {
-            delete tree_vertical_representation;
+        for(auto it = tree_vertical_representation.begin(); it != tree_vertical_representation.end(); ++it) {
+            delete (*it).second;
         }
     }
 
