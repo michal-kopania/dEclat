@@ -65,9 +65,6 @@ void tree::print_frequent_itemset(const std::string &file, bool sorted)
 void tree::print_frequent_itemset(node *pNode, std::string all_ascendants, ofstream &file)
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
-        if((*it)->level == this->max_level) {
-            ++number_of_items_of_greatest_cardinality;
-        }
         ////format: length, sup, discovered_frequent_itemset
         string parent = all_ascendants;
         if((*it)->level > 1) {
@@ -86,9 +83,6 @@ void tree::print_frequent_itemset(node *pNode, std::string all_ascendants, ofstr
 void tree::print_frequent_itemset_sorted(node *pNode, std::set<unsigned int> all_ascendants, ofstream &file)
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
-        if((*it)->level == this->max_level) {
-            ++number_of_items_of_greatest_cardinality;
-        }
         ////format: length, sup, discovered_frequent_itemset
         all_ascendants.insert((*it)->element);
         string parent = "";

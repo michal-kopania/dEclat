@@ -626,8 +626,6 @@ int main(int argc, const char **argv)
         cout << "create_vertical_representation()" << endl;
         hierarchy_tree->create_vertical_representation();
         auto levels = (*(--hierarchy_tree->tree_vertical_representation.end())).first;
-        unsigned int number_of_items_of_greatest_cardinality_for_level[levels], greatest_cardinality[levels];
-        unsigned int max_level = 0;
         for(auto it = hierarchy_tree->tree_vertical_representation.begin();
             it != hierarchy_tree->tree_vertical_representation.end(); ++it) {
             struct tree tree_for_hierarchy;
@@ -638,14 +636,6 @@ int main(int argc, const char **argv)
             traverse(tree_for_hierarchy.root, tree_for_hierarchy, hierarchy_tree);
             tree_for_hierarchy.print_frequent_itemset(out_filename, items_sorted);
             auto l = (*it).first - 1;
-            number_of_items_of_greatest_cardinality_for_level[l] = tree_for_hierarchy.number_of_items_of_greatest_cardinality;
-            greatest_cardinality[l] = tree_for_hierarchy.max_level;
-        }
-        for(int i = 0; i < levels; ++i) {
-            if(greatest_cardinality[i] > taxonomy_greatest_cardinality) {
-                taxonomy_greatest_cardinality = greatest_cardinality[i];
-                taxonomy_number_of_items_of_greatest_cardinality = number_of_items_of_greatest_cardinality_for_level[i];
-            }
         }
 
         hierarchy_tree->clear_sets_in_nodes();
@@ -702,15 +692,15 @@ int main(int argc, const char **argv)
         myfile << "total runtime: " << e - start_time << " sec." << endl;
 
         unsigned int number_of_items_of_greatest_cardinality;
-        if(tree.max_level > taxonomy_greatest_cardinality) {
-            number_of_items_of_greatest_cardinality = tree.number_of_items_of_greatest_cardinality;
-        } else if(tree.max_level == taxonomy_greatest_cardinality) {
-            number_of_items_of_greatest_cardinality =
-                    tree.number_of_items_of_greatest_cardinality + taxonomy_number_of_items_of_greatest_cardinality;
-        } else {
-            number_of_items_of_greatest_cardinality = taxonomy_number_of_items_of_greatest_cardinality;
+        if(!number_of_created_candidates_and_frequent_itemsets_of_length.empty()) {
+            for(auto rit = number_of_created_candidates_and_frequent_itemsets_of_length.crbegin();
+                rit != number_of_created_candidates_and_frequent_itemsets_of_length.crend(); ++rit) {
+                if((*rit).second.second > 0) {
+                    number_of_items_of_greatest_cardinality = (*rit).second.second;
+                    break;
+                }
+            }
         }
-
         myfile << "the number of items in a discovered frequent itemset of the greatest cardinality: "
                << number_of_items_of_greatest_cardinality << endl;
         myfile << "total # of created candidates: " << number_of_created_candidates << endl;

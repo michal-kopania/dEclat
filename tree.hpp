@@ -48,7 +48,6 @@ struct tree
 {
     node *root; //Root node
     unsigned int max_level = 0; //How deep is a tree
-    unsigned int number_of_items_of_greatest_cardinality = 0; //the number of items in a discovered frequent itemset of the greatest cardinality
 
     //std::unordered_map<node *, bool> visited; //Needed for graph not needed for tree
 
