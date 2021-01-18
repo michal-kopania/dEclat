@@ -64,6 +64,7 @@ void tree::print_frequent_itemset(const std::string &file, bool sorted)
 
 void tree::print_frequent_itemset(node *pNode, std::string all_ascendants, ofstream &file)
 {
+    int el = pNode->element;
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         ////format: length, sup, discovered_frequent_itemset
         string parent = all_ascendants;
@@ -84,20 +85,22 @@ void tree::print_frequent_itemset_sorted(node *pNode, std::set<unsigned int> all
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         ////format: length, sup, discovered_frequent_itemset
-        all_ascendants.insert((*it)->element);
+        std::set<unsigned int> ascendants;
+        ascendants = all_ascendants;
+        ascendants.insert((*it)->element);
         string parent = "";
-        for(auto it = all_ascendants.begin(); it != all_ascendants.end(); ++it) {
+        for(auto p_it = ascendants.begin(); p_it != ascendants.end(); ++p_it) {
             if(parent != "") {
                 parent += ", ";
             }
-            parent += to_string((*it));
+            parent += to_string((*p_it));
         }
         if(file.is_open()) {
             file << (*it)->level << "\t" << (*it)->support << "\t" << parent << endl;
         } else {
             cout << (*it)->level << "\t" << (*it)->support << "\t" << parent << endl;
         }
-        this->print_frequent_itemset_sorted((*it), all_ascendants, file);
+        this->print_frequent_itemset_sorted((*it), ascendants, file);
     }
 }
 

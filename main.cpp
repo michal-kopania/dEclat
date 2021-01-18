@@ -514,7 +514,9 @@ int main(int argc, const char **argv)
         cout << "sorted was set to: "
              << items_sorted << "\n";
         stat_data.push_back("sorted was set to: " + to_string(items_sorted));
-        s_sorted = "_sorted";
+        s_sorted = "_sorted_" + to_string(items_sorted);
+    } else {
+        s_sorted = "_sorted_0";
     }
 
     bool use_taxonomy;
