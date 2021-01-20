@@ -3,8 +3,12 @@
 //
 
 #include "tree.hpp"
+#include <map>
 
 using namespace std;
+
+extern bool are_items_mapped_to_string;
+extern std::map<unsigned int, string> names_for_items;
 
 void tree::add(node *current_node, node *parent_node)
 {
@@ -68,10 +72,21 @@ void tree::print_frequent_itemset(node *pNode, std::string all_ascendants, ofstr
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         ////format: length, sup, discovered_frequent_itemset
         string parent = all_ascendants;
+        string str_element;
+        if(are_items_mapped_to_string) {
+            auto search = names_for_items.find((*it)->element);
+            if(search != names_for_items.end()) {
+                str_element = search->second;
+            } else {
+                str_element = to_string((*it)->element);
+            }
+        } else {
+            str_element = to_string((*it)->element);
+        }
         if((*it)->level > 1) {
             parent += ", ";
         }
-        parent += to_string((*it)->element);
+        parent += str_element;
         if(file.is_open()) {
             file << (*it)->level << "\t" << (*it)->support << "\t" << parent << "" << endl;
         } else {
@@ -89,11 +104,29 @@ void tree::print_frequent_itemset_sorted(node *pNode, std::set<unsigned int> all
         ascendants = all_ascendants;
         ascendants.insert((*it)->element);
         string parent = "";
-        for(auto p_it = ascendants.begin(); p_it != ascendants.end(); ++p_it) {
-            if(parent != "") {
-                parent += ", ";
+        if(are_items_mapped_to_string) {
+            std::set<string> str_ascendants;
+            for(auto p_it = ascendants.begin(); p_it != ascendants.end(); ++p_it) {
+                auto search = names_for_items.find(*p_it);
+                if(search != names_for_items.end()) {
+                    str_ascendants.insert(search->second);
+                } else {
+                    str_ascendants.insert(to_string(*p_it));
+                }
             }
-            parent += to_string((*p_it));
+            for(auto p_it = str_ascendants.begin(); p_it != str_ascendants.end(); ++p_it) {
+                if(parent != "") {
+                    parent += ", ";
+                }
+                parent += (*p_it);
+            }
+        } else {
+            for(auto p_it = ascendants.begin(); p_it != ascendants.end(); ++p_it) {
+                if(parent != "") {
+                    parent += ", ";
+                }
+                parent += to_string((*p_it));
+            }
         }
         if(file.is_open()) {
             file << (*it)->level << "\t" << (*it)->support << "\t" << parent << endl;

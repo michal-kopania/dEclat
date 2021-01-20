@@ -26,6 +26,37 @@ unsigned int number_of_created_candidates = 0; //total # of created candidates,
 unsigned int number_of_frequent_itemsets = 0;// total # of discovered frequent itemsets
 std::map<unsigned int, pair<unsigned int, unsigned int>> number_of_created_candidates_and_frequent_itemsets_of_length; //For stats
 //- # of created candidates of length 1, total # of discovered frequent itemsets of length 1
+bool are_items_mapped_to_string = false;
+std::map<unsigned int, string> names_for_items;
+
+std::vector<std::string> split(std::string str, std::string sep, int limit)
+{
+    char *cstr = const_cast<char *>(str.c_str());
+    char *current;
+    std::vector<std::string> arr;
+    current = strtok(cstr, sep.c_str());
+    int count = 0;
+    while(current != NULL) {
+        ++count;
+        if(count > limit && limit != -1) {
+            break;
+        }
+        arr.push_back(current);
+        current = strtok(NULL, sep.c_str());
+    }
+    return arr;
+}
+
+std::vector<std::string> split(const std::string &s, char delimiter)
+{
+    std::vector<std::string> tokens;
+    std::string token;
+    std::istringstream tokenStream(s);
+    while(std::getline(tokenStream, token, delimiter)) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
 
 double get_wall_time()
 {
@@ -109,6 +140,21 @@ int read_dataset(const string &filename, bool use_taxonomy)
         std::set<unsigned int> parent_elements; //For debug
         unsigned int element;
         if(line[0] == '@') {
+            //map ids to string
+            line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+            line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
+            vector<string> tokens;
+            tokens = split(line, "=", 3);
+            if(tokens.size() == 3) {
+                are_items_mapped_to_string = true;
+                unsigned int id;
+                id = std::stoul(tokens[1]);
+                names_for_items[id] = tokens[2];
+            } else {
+                cerr << "format error. Should be @ITEM=N=S where N - unsigned int, S - string. Parsed line is: " << line
+                     << endl;
+                return -1;
+            }
             continue;
         }
         ++t_id;
@@ -599,7 +645,10 @@ int main(int argc, const char **argv)
 
     vertical_representation = new std::unordered_map<unsigned int, std::set<unsigned int> *>;
     auto s = get_wall_time();
-    read_dataset(data_filename, use_taxonomy);
+    int ret = read_dataset(data_filename, use_taxonomy);
+    if(ret == -1) {
+        return -1;
+    }
     auto e = get_wall_time();
     cout << "reading and extending the dataset with transactions with hierarchical items: " << e - s << " sec." << endl;
     stat_data.push_back(
