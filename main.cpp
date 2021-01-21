@@ -486,6 +486,24 @@ void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy)
         cout << "---------- free memory --------" <<endl;
 #endif
         (*it)->diff_set.clear();
+        //(*it)->print();
+        //TODO: save to file and clear memory
+        /*
+        (*it)->print();
+         ofstream myfile;
+    if(file != "") {
+        myfile.open(file, fstream::out | fstream::app);
+        if(!myfile) {
+            cout << "Cannot open file: " << file << endl << "Results will not be saved and be printed at stdio instead"
+                 << endl;
+            myfile.close();
+        } else {
+            //myfile << "length\tsup\tdiscovered_frequent_itemset" << endl;
+        }
+    }
+        delete (*it);
+        *it = nullptr;
+         */
     }
 }
 

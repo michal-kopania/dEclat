@@ -39,6 +39,7 @@ struct node
     {
         for(auto it = children.begin(); it != children.end(); ++it) {
             delete *it;
+            *it = nullptr;
         }
     }
 
