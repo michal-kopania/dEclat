@@ -28,6 +28,7 @@ std::map<unsigned int, pair<unsigned int, unsigned int>> number_of_created_candi
 //- # of created candidates of length 1, total # of discovered frequent itemsets of length 1
 bool are_items_mapped_to_string = false;
 std::map<unsigned int, string> names_for_items;
+double save_time = 0;
 
 std::vector<std::string> split(std::string str, std::string sep, int limit)
 {
@@ -400,7 +401,45 @@ void difference(const std::set<unsigned int> &diff_set1, const std::set<unsigned
     }
 }
 
-void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy)
+void print_frequent_itemset_and_delete_node(node *pNode, const string &file, bool sorted)
+{
+    string ascendant = "";
+    ofstream myfile;
+    if(file != "") {
+        myfile.open(file, fstream::out | fstream::app);
+        if(!myfile) {
+            cout << "Cannot open file: " << file << endl << "Results will not be saved and be printed at stdio instead"
+                 << endl;
+            myfile.close();
+        } else {
+            //myfile << "length\tsup\tdiscovered_frequent_itemset" << endl;
+        }
+    }
+    auto s = get_wall_time();
+    if(myfile.is_open()) {
+        myfile << pNode->level << "\t" << pNode->support << "\t" << pNode->element << "" << endl;
+    } else {
+        cout << pNode->level << "\t" << pNode->support << "\t" << pNode->element << "" << endl;
+    }
+
+    if(sorted) {
+        std::set<unsigned int> set_ascendant;
+        set_ascendant.insert(pNode->element);
+        tree.print_frequent_itemset_sorted(pNode, set_ascendant, myfile);
+    } else {
+        ascendant = to_string(pNode->element);
+        tree.print_frequent_itemset(pNode, ascendant, myfile);
+    }
+    if(myfile.is_open()) {
+        myfile.close();
+    }
+    auto e = get_wall_time();
+    save_time += e - s;
+
+    delete pNode;
+}
+
+void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy, const string &file, bool sorted)
 {
     //TODO: Wykorzystać t_taxonomy?
     //Jeśli t_taxonomy nie jest null to można sprawdzać czy right hand brother to nie jest czasem parent
@@ -420,10 +459,17 @@ void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy)
     //Czyli: support = (*b_it)->support - N = (*it)->support + N - N = (*it)->support
     //Jeśli sobie ustawię tak elementy że najpierw będę miał parent to będę mógł znacznie zmniejszyć obliczenia.
     //Tylko, że difference() zakłada posortowane elementy. Zatem root powinien w hierarchi mieć najmniejszą wartość
+    auto prev_it = pNode->children.begin();
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
+        if(it != pNode->children.begin()) {
+            prev_it = it;
+        }
 #if DEBUG_LEVEL > 1
         (*it)->print();
 #endif
+        if(*it == nullptr) {
+            continue;
+        }
         if((*it)->support > min_sup) {
             auto brother = it;
             brother++; //For all right hand brothers
@@ -478,33 +524,27 @@ void traverse(node *pNode, struct tree &t, taxonomy_tree *t_taxonomy)
                     delete new_node;
                 }
             }
-            traverse((*it), t, t_taxonomy);
+            traverse((*it), t, t_taxonomy, file, sorted);
         }
 #if DEBUG_LEVEL > 1
         cout << "---------- free memory --------" <<endl;
         (*it)->print();
         cout << "---------- free memory --------" <<endl;
 #endif
-        (*it)->diff_set.clear();
-        //(*it)->print();
-        //TODO: save to file and clear memory
+        if(*it != nullptr) {
+            (*it)->diff_set.clear();
+        }
+        if(it != pNode->children.begin()) {
+            if((*prev_it)->level == 1) {
+                print_frequent_itemset_and_delete_node((*prev_it), file, sorted);
+                *prev_it = nullptr;
+            }
+        }
         /*
         (*it)->print();
-         ofstream myfile;
-    if(file != "") {
-        myfile.open(file, fstream::out | fstream::app);
-        if(!myfile) {
-            cout << "Cannot open file: " << file << endl << "Results will not be saved and be printed at stdio instead"
-                 << endl;
-            myfile.close();
-        } else {
-            //myfile << "length\tsup\tdiscovered_frequent_itemset" << endl;
-        }
-    }
-        delete (*it);
-        *it = nullptr;
          */
     }
+
 }
 
 void print_out_file_header(const std::string &file)
@@ -702,7 +742,7 @@ int main(int argc, const char **argv)
             cout << "traverse for taxonomy for level: " << (*it).first << endl;
             //TODO: hierarchy_tree may be used to speed up the process.
             //I do not have to calculate list: A, B (parent of A), C (parent of B) if list: A was already calculated.
-            traverse(tree_for_hierarchy.root, tree_for_hierarchy, hierarchy_tree);
+            traverse(tree_for_hierarchy.root, tree_for_hierarchy, hierarchy_tree, out_filename, items_sorted);
             tree_for_hierarchy.print_frequent_itemset(out_filename, items_sorted);
             auto l = (*it).first - 1;
         }
@@ -720,7 +760,7 @@ int main(int argc, const char **argv)
 
     s = get_wall_time();
     //dEclat algo
-    traverse(tree.root, tree, nullptr);
+    traverse(tree.root, tree, nullptr, out_filename, items_sorted);
 
     //I can delete hierarchy_tree here too
     for(auto it = vertical_representation->begin(); it != vertical_representation->end(); ++it) {
@@ -741,6 +781,7 @@ int main(int argc, const char **argv)
 #endif
 
     s = get_wall_time();
+    // If printed in traverse than cannot be printed here
     tree.print_frequent_itemset(out_filename, items_sorted);
     ofstream myfile;
     if(stat_filename != "") {
@@ -757,7 +798,7 @@ int main(int argc, const char **argv)
     }
     e = get_wall_time();
     if(myfile.is_open()) {
-        myfile << "saving results to OUT and STAT files: " << e - s << " sec." << endl;
+        myfile << "saving results to OUT and STAT files: " << save_time + e - s << " sec." << endl;
         myfile << "total runtime: " << e - start_time << " sec." << endl;
 
         unsigned int number_of_items_of_greatest_cardinality;

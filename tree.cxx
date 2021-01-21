@@ -71,6 +71,9 @@ void tree::print_frequent_itemset(node *pNode, std::string all_ascendants, ofstr
     int el = pNode->element;
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         ////format: length, sup, discovered_frequent_itemset
+        if(*it == nullptr) {
+            continue;
+        }
         string parent = all_ascendants;
         string str_element;
         if(are_items_mapped_to_string) {
@@ -100,6 +103,9 @@ void tree::print_frequent_itemset_sorted(node *pNode, std::set<unsigned int> all
 {
     for(auto it = pNode->children.begin(); it != pNode->children.end(); ++it) {
         ////format: length, sup, discovered_frequent_itemset
+        if((*it) == nullptr) {
+            continue;
+        }
         std::set<unsigned int> ascendants;
         ascendants = all_ascendants;
         ascendants.insert((*it)->element);

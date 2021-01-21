@@ -31,6 +31,7 @@ struct node
 
     unsigned int level = 0; //On which level of a tree node is
 
+    //bool visited = false;
     //std::string name;
 
     void print();
@@ -59,6 +60,10 @@ struct tree
     //format: length, sup, discovered_frequent_itemset
     void print_frequent_itemset(const std::string &file, bool sorted);
 
+    void print_frequent_itemset(node *pNode, std::string all_ascendants, std::ofstream &file);
+
+    void print_frequent_itemset_sorted(node *pNode, std::set<unsigned int> all_ascendants, std::ofstream &file);
+
     ~tree()
     {
         delete root;
@@ -66,10 +71,6 @@ struct tree
 
 private:
     void print(node *pNode);
-
-    void print_frequent_itemset(node *pNode, std::string all_ascendants, std::ofstream &file);
-
-    void print_frequent_itemset_sorted(node *pNode, std::set<unsigned int> all_ascendants, std::ofstream &file);
 
 };
 
