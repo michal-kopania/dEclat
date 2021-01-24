@@ -415,11 +415,19 @@ void print_frequent_itemset_and_delete_node(node *pNode, const string &file, boo
             //myfile << "length\tsup\tdiscovered_frequent_itemset" << endl;
         }
     }
+    string str_name = to_string(pNode->element);
+    if(are_items_mapped_to_string) {
+        std::set<string> str_ascendants;
+        auto search = names_for_items.find(pNode->element);
+        if(search != names_for_items.end()) {
+            str_name = search->second;
+        }
+    }
     auto s = get_wall_time();
     if(myfile.is_open()) {
-        myfile << pNode->level << "\t" << pNode->support << "\t" << pNode->element << "" << endl;
+        myfile << pNode->level << "\t" << pNode->support << "\t" << str_name << "" << endl;
     } else {
-        cout << pNode->level << "\t" << pNode->support << "\t" << pNode->element << "" << endl;
+        cout << pNode->level << "\t" << pNode->support << "\t" << str_name << "" << endl;
     }
 
     if(sorted) {
